@@ -1,0 +1,8 @@
+[submodule "tools/diffuzz"]
+	path = tools/diffuzz
+	url = https://github.com/xhanulik/diffuzz.git
+	branch = afl++
+[submodule "tools/AFLplusplus"]
+	path = tools/AFLplusplus
+	url = https://github.com/xhanulik/AFLplusplus
+	branch = wca
