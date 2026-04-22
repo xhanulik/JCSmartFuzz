@@ -10,9 +10,33 @@ Nothing in this file is LLM-specific -- it only reads AFL++ artifacts.
 import glob
 import logging
 import os
+import re
 import time
 
 log = logging.getLogger(__name__)
+
+
+_RE_OP = re.compile(r",op:([^,]+)")
+_RE_ORIG = re.compile(r",orig:([^,]+)")
+
+
+def parse_queue_name(name):
+    """Extract AFL++ metadata from a queue filename.
+
+    Returns a dict with ``is_original`` (bool), ``is_cov`` (bool), and
+    ``op`` (str | None).  ``op`` is set to ``"initial seed (...)"`` for
+    files that carry an ``orig:`` field, to the mutation operator
+    otherwise.
+    """
+    is_cov = ",+cov" in name
+    orig_m = _RE_ORIG.search(name)
+    is_original = orig_m is not None
+    if is_original:
+        op = f"initial seed ({orig_m.group(1)})"
+    else:
+        op_m = _RE_OP.search(name)
+        op = op_m.group(1) if op_m else None
+    return {"is_original": is_original, "is_cov": is_cov, "op": op}
 
 
 class AFLStatsReader:
@@ -70,93 +94,6 @@ class AFLStatsReader:
             log.warning("Could not read fuzzer_stats: %s", e)
         return stats
 
-    def read_queue_entries(self, max_entries=50):
-        """Read the most interesting queue entries according to path costs.
-
-        When ``path_costs.csv`` is available, entries are ranked by cost
-        (ascending -- lowest cost = most interesting for fuzzing) and
-        the *max_entries* cheapest are returned.  Falls back to the most
-        recent entries when cost data is unavailable.
-
-        Args:
-            max_entries: Maximum number of entries to return.
-
-        Returns:
-            list[tuple[str, bytes]]: List of (filename, content) pairs,
-                ordered by cost (cheapest first) when cost data exists,
-                or by recency otherwise.
-        """
-        if not self.instance_dir:
-            return []
-        queue_dir = os.path.join(self.instance_dir, "queue")
-
-        # Try cost-based selection first.
-        costs = self.read_path_costs()
-        if costs:
-            # Pick the max_entries lowest-cost filenames.
-            selected = [row["filename"] for row in costs[:max_entries]]
-            result = []
-            for fname in selected:
-                entry_path = os.path.join(queue_dir, fname)
-                try:
-                    with open(entry_path, "rb") as f:
-                        result.append((fname, f.read()))
-                except OSError:
-                    continue
-            return result
-
-        # Fallback: most recent entries by sort order.
-        entries = sorted(glob.glob(os.path.join(queue_dir, "id:*")))
-        result = []
-        for entry_path in entries[-max_entries:]:
-            try:
-                with open(entry_path, "rb") as f:
-                    content = f.read()
-                result.append((os.path.basename(entry_path), content))
-            except OSError:
-                continue
-        return result
-
-    def read_crashes(self, max_entries=20):
-        """Read crashing inputs.
-
-        Returns:
-            list[tuple[str, bytes]]: List of (filename, content) pairs.
-        """
-        if not self.instance_dir:
-            return []
-        crash_dir = os.path.join(self.instance_dir, "crashes")
-        entries = sorted(glob.glob(os.path.join(crash_dir, "id:*")))
-        result = []
-        for entry_path in entries[-max_entries:]:
-            try:
-                with open(entry_path, "rb") as f:
-                    result.append((os.path.basename(entry_path), f.read()))
-            except OSError:
-                continue
-        return result
-
-    def read_plot_data(self, last_n_lines=20):
-        """Read the tail of plot_data for trend analysis.
-
-        Returns:
-            list[str]: Last N lines of plot_data.
-        """
-        if not self.instance_dir:
-            return []
-        plot_path = os.path.join(self.instance_dir, "plot_data")
-        try:
-            with open(plot_path) as f:
-                lines = f.readlines()
-            if not lines:
-                return []
-            # First line is the column header; always include it.
-            header = [lines[0]]
-            data = lines[1:]
-            return header + data[-last_n_lines:]
-        except OSError:
-            return []
-
     def read_path_costs(self):
         """Parse ``path_costs.csv`` and return entries sorted by cost.
 
@@ -207,12 +144,3 @@ class AFLStatsReader:
         rows.sort(key=lambda r: (r["time"], r["memory"],
                                  r["instructions"], r["user_defined"]))
         return rows
-
-    def is_coverage_stalling(self):
-        """Check if the fuzzer has gone multiple cycles without new paths."""
-        stats = self.read_stats()
-        try:
-            cycles_wo_finds = int(stats.get("cycles_wo_finds", "0"))
-        except ValueError:
-            return False
-        return cycles_wo_finds > 2

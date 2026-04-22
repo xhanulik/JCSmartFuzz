@@ -8,15 +8,33 @@ Java or if you need custom extraction.
 See ``__main__.py`` for the CLI entry point.
 """
 
+import json
 import logging
 import os
 import sys
 import time
+import urllib.error
+import urllib.request
 
-from afl_stats_reader import AFLStatsReader
+from afl_stats_reader import AFLStatsReader, parse_queue_name
 from source_reader import SourceReader
 
 log = logging.getLogger(__name__)
+
+# e-INFRA CZ AI-as-a-Service (OpenAI-compatible) chat completions endpoint.
+# See https://docs.cerit.io/en/docs/ai-as-a-service/ai-api
+E_INFRA_ENDPOINT = "https://llm.ai.e-infra.cz/v1/chat/completions"
+E_INFRA_DEFAULT_MODEL = "gpt-oss-120b"
+E_INFRA_TIMEOUT_SECONDS = 120
+
+
+def _format_hex(data, bytes_per_line=16):
+    """Render *data* as space-separated uppercase hex, wrapped in lines."""
+    out = []
+    for i in range(0, len(data), bytes_per_line):
+        chunk = data[i:i + bytes_per_line]
+        out.append(" ".join(f"{b:02X}" for b in chunk))
+    return "\n".join(out) if out else "(empty)"
 
 
 class LLMSeedGenerator:
@@ -32,13 +50,32 @@ class LLMSeedGenerator:
     Extension points -- see the per-method comments below.
     """
 
-    def __init__(self, source_code_path, afl_out_dir, seed_output_dir):
+    def __init__(self, source_code_path, afl_out_dir, seed_output_dir,
+                 op_name=None, model=E_INFRA_DEFAULT_MODEL, api_token=None):
+        """
+        Args:
+            source_code_path: Path to the target applet .java source file.
+            afl_out_dir: AFL++ ``-o`` output directory.
+            seed_output_dir: Destination for generated seeds
+                (AFL++ ``-F`` foreign-sync target).
+            op_name: Operation name ``Xxx``.  When set, the prompt
+                contains only ``wrap<Xxx>`` and ``core<Xxx>`` extracted
+                from the source.  When ``None``, the source reader falls
+                back to full-class extraction.
+            model: Model name or alias on the e-INFRA CZ endpoint
+                (e.g. ``"llama3.3:latest"``, ``"coder"``, ``"mini"``).
+            api_token: Bearer token for the e-INFRA CZ API.  When
+                ``None``, falls back to the ``LLM_API_TOKEN`` env var.
+        """
         self.source_code_path = source_code_path
+        self.op_name = op_name
         self.source_reader = SourceReader(source_code_path)
         self.stats_reader = AFLStatsReader(afl_out_dir)
         self.seed_output_dir = seed_output_dir
         self.seed_counter = 0
         self.seeds_accepted = 0
+        self.model = model
+        self.api_token = api_token or os.environ.get("LLM_API_TOKEN")
         os.makedirs(seed_output_dir, exist_ok=True)
 
     # ==================================================================
@@ -48,10 +85,9 @@ class LLMSeedGenerator:
     def read_source_context(self):
         """Return source code of the target program for the LLM prompt.
 
-        The default reads ``.java`` files from ``self.source_code_path``,
-        extracts complete class definitions (prioritising applet /
-        parser / input-handling classes), and assembles them into a
-        budget-limited string via ``SourceReader``.
+        When ``self.op_name`` is set, returns just ``wrap<OpName>`` and
+        ``core<OpName>`` extracted from the source.  Otherwise, falls
+        back to the full class extraction provided by ``SourceReader``.
 
         CAN be overridden to:
           - Return a hand-written protocol summary instead.
@@ -61,6 +97,9 @@ class LLMSeedGenerator:
         Returns:
             str: Source code snippet or summary.
         """
+        if self.op_name:
+            return self.source_reader.build_method_context(
+                [f"wrap{self.op_name}", f"core{self.op_name}"])
         return self.source_reader.build_context()
 
     # ==================================================================
@@ -68,84 +107,211 @@ class LLMSeedGenerator:
     # ==================================================================
 
     def call_llm(self, prompt):
-        """Send *prompt* to an LLM and return the response text.
+        """Send *prompt* to the e-INFRA CZ AI API and return the reply text.
 
-        MUST be implemented by every subclass.
+        Uses the OpenAI-compatible ``/v1/chat/completions`` endpoint at
+        ``llm.ai.e-infra.cz`` with ``self.model`` and ``self.api_token``.
 
-        Connect to whichever LLM backend you prefer (Anthropic, OpenAI,
-        a local model, etc.).
+        CAN be overridden to target a different backend (Anthropic,
+        OpenAI, local, etc.).
 
         Args:
             prompt: The full prompt string built by ``build_prompt()``.
 
         Returns:
-            str: The raw LLM response text.
+            str: The assistant message content from the first choice.
+
+        Raises:
+            RuntimeError: if the API token is missing, the HTTP call
+                fails, or the response has no choices.
         """
-        raise NotImplementedError(
-            "Subclass LLMSeedGenerator and implement call_llm()")
+        if not self.api_token:
+            raise RuntimeError(
+                "LLM_API_TOKEN is not set. Export the env var or pass "
+                "api_token=... to LLMSeedGenerator.")
+
+        body = json.dumps({
+            "model": self.model,
+            "messages": [{"role": "user", "content": prompt}],
+        }).encode("utf-8")
+
+        req = urllib.request.Request(
+            E_INFRA_ENDPOINT,
+            data=body,
+            headers={
+                "Authorization": f"Bearer {self.api_token}",
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+
+        try:
+            with urllib.request.urlopen(req, timeout=E_INFRA_TIMEOUT_SECONDS) as resp:
+                payload = json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as e:
+            err_body = e.read().decode("utf-8", errors="replace")
+            raise RuntimeError(
+                f"LLM API HTTP {e.code} {e.reason}: {err_body}") from e
+        except urllib.error.URLError as e:
+            raise RuntimeError(f"LLM API network error: {e.reason}") from e
+
+        choices = payload.get("choices") or []
+        if not choices:
+            raise RuntimeError(
+                f"LLM API returned no choices: {payload!r}")
+        return choices[0]["message"]["content"]
 
     # ==================================================================
     # SHOULD consider overriding -- the defaults work but are generic.
     # Tailoring these to your target will significantly improve results.
     # ==================================================================
 
-    def build_prompt(self, stats, queue_samples, source_context):
+    # Scoring weights for non-original queue entries.  The tuple order
+    # is (coverage-increasing flag, instructions hit); sorted descending,
+    # so +cov entries outrank non-+cov entries regardless of instruction
+    # count, and among equals the higher instruction count wins.
+    def score_queue_entry(self, entry):
+        """Return a sort key for ranking non-original queue entries.
+
+        CAN be overridden to combine other signals (time, memory,
+        user-defined cost).  Originals are never scored -- they are
+        always included unconditionally.
+        """
+        return (1 if entry["is_cov"] else 0, entry["instructions"])
+
+    def select_interesting_inputs(self, max_entries=10):
+        """Select queue entries to show to the LLM.
+
+        All original seeds are included unconditionally.  The remaining
+        slots are filled with the highest-scoring non-original entries
+        according to ``score_queue_entry()``.
+
+        Args:
+            max_entries: Soft cap on the number of non-original entries;
+                originals are always in addition to this.
+
+        Returns:
+            list[dict]: Each dict has keys ``filename``, ``content``,
+                ``instructions``, ``is_original``, ``is_cov``, ``op``.
+        """
+        if not self.stats_reader.instance_dir:
+            return []
+        queue_dir = os.path.join(self.stats_reader.instance_dir, "queue")
+        if not os.path.isdir(queue_dir):
+            return []
+
+        # filename -> instructions (from path_costs.csv, if present)
+        costs_by_name = {row["filename"]: row
+                         for row in self.stats_reader.read_path_costs()}
+
+        entries = []
+        for fname in sorted(os.listdir(queue_dir)):
+            if not fname.startswith("id:"):
+                continue
+            path = os.path.join(queue_dir, fname)
+            if not os.path.isfile(path):
+                continue
+            try:
+                with open(path, "rb") as f:
+                    content = f.read()
+            except OSError:
+                continue
+            meta = parse_queue_name(fname)
+            cost = costs_by_name.get(fname, {})
+            entries.append({
+                "filename":     fname,
+                "content":      content,
+                "instructions": cost.get("instructions", 0),
+                "is_original":  meta["is_original"],
+                "is_cov":       meta["is_cov"],
+                "op":           meta["op"],
+            })
+
+        originals = [e for e in entries if e["is_original"]]
+        others    = [e for e in entries if not e["is_original"]]
+        others.sort(key=self.score_queue_entry, reverse=True)
+
+        return originals + others[:max_entries]
+
+    def format_interesting_inputs(self, entries):
+        """Render selected queue entries as prompt-ready text blocks."""
+        if not entries:
+            return "(no queue entries available yet)"
+
+        blocks = []
+        seed_n = 0
+        input_n = 0
+        for e in entries:
+            if e["is_original"]:
+                seed_n += 1
+                header = f"Seed {seed_n}:"
+            else:
+                input_n += 1
+                header = f"Input {input_n}:"
+            cov = "YES" if (e["is_cov"] or e["is_original"]) else "NO"
+            blocks.append(
+                f"{header}\n"
+                f"Length: {len(e['content'])}\n"
+                f"Instructions: {e['instructions']}\n"
+                f"Discovered via: {e['op'] or 'unknown'}\n"
+                f"Coverage-increasing: {cov}\n"
+                f"Hex encoded fuzzing input:\n"
+                f"{_format_hex(e['content'])}"
+            )
+        return "\n\n".join(blocks)
+
+    def build_prompt(self, stats, interesting_inputs, source_context):
         """Build the LLM prompt from fuzzer state and source code.
-
-        SHOULD be overridden to tailor the prompt to your target.
-
-        The default prompt is a reasonable starting point, but you will
-        get much better seeds if you:
-          - Describe the expected input format (grammar, protocol, etc.).
-          - Include coverage gaps or unreached branches if available.
-          - Ask for specific mutation strategies when coverage stalls.
 
         Args:
             stats: dict from AFLStatsReader.read_stats().
-            queue_samples: list of (filename, bytes) from read_queue_entries().
+            interesting_inputs: list[dict] from select_interesting_inputs().
             source_context: str from read_source_context().
 
         Returns:
             str: The prompt to send to the LLM.
         """
-        # Show a few queue samples as hex (truncated to 64 bytes each)
-        sample_lines = []
-        for fname, data in queue_samples[:5]:
-            hex_str = data[:64].hex()
-            sample_lines.append(f"  {fname}: {hex_str}")
-        samples_text = "\n".join(sample_lines) if sample_lines else "  (none)"
+        input_format = (
+            "[ p1_A | p2_A | len_A | data_A(MAX_DATA) "
+            "| p1_B | p2_B | len_B | data_B(MAX_DATA) ]"
+        )
 
-        stalling = self.stats_reader.is_coverage_stalling()
+        input_mapping = (
+            "buffer[ISO7816.OFFSET_P1]    = p1\n"
+            "buffer[ISO7816.OFFSET_P2]    = p2\n"
+            "buffer[ISO7816.OFFSET_LC]    = len\n"
+            "buffer[ISO7816.OFFSET_CDATA] = start of data"
+        )
+
+        inputs_section = self.format_interesting_inputs(interesting_inputs)
 
         prompt = f"""\
-You are a fuzzing expert. Generate new test inputs for a target program
-that will explore uncovered code paths.
+You are a fuzzing expert.  Generate new test inputs for a Java Card
+applet that will explore uncovered code paths and expose timing
+side-channel differences between input sets A and B.
 
-=== Target Source Code ===
+=== 1. Fuzzing input format received by driver ===
+{input_format}
+
+=== 2. Mapping of one fuzzing input to the actual values ===
+{input_mapping}
+
+=== 3. Fuzzed source code ===
 {source_context}
 
-=== Current Fuzzer Stats ===
-- Total paths: {stats.get('paths_total', '?')}
-- Paths found this run: {stats.get('paths_found', '?')}
-- Unique crashes: {stats.get('saved_crashes', '?')}
-- Bitmap coverage: {stats.get('bitmap_cvg', '?')}
-- Execs per second: {stats.get('execs_per_sec', '?')}
-- Cycles without new finds: {stats.get('cycles_wo_finds', '?')}
-- Coverage is stalling: {stalling}
-
-=== Recent Queue Samples (hex, truncated to 64 bytes) ===
-{samples_text}
+=== 4. AFL++ interesting inputs ===
+{inputs_section}
 
 === Instructions ===
-Generate 5 new test inputs. Each input should be designed to exercise
-different code paths in the target. Consider:
-- Edge cases in parsing logic
-- Boundary values
-- Unusual but valid input structures
-- Inputs that might trigger error-handling paths
+Generate new test inputs that follow the exact byte layout shown in
+section 1.  Prefer inputs that:
+- Exercise code paths not covered by the seeds/inputs above.
+- Drive A and B down divergent branches to surface timing leaks.
+- Explore edge values of p1, p2, and len (including len == 0 and
+  len == MAX_DATA).
 
-Return ONLY the raw hex-encoded test inputs, one per line.
-Do not include any explanation or commentary, just hex strings."""
+Return ONLY the raw hex-encoded test inputs, one per line.  No prose,
+no code fences, no commentary."""
 
         return prompt
 
@@ -253,22 +419,22 @@ Do not include any explanation or commentary, just hex strings."""
             log.warning("No fuzzer stats available yet")
             return 0
 
-        queue_samples = self.stats_reader.read_queue_entries(max_entries=10)
-        # source_context = self.read_source_context()
+        interesting = self.select_interesting_inputs(max_entries=10)
+        source_context = self.read_source_context()
 
-        # prompt = self.build_prompt(stats, queue_samples, source_context)
-        # log.info("Calling LLM (prompt length: %d chars) ...", len(prompt))
-        #
-        # response = self.call_llm(prompt)
-        # log.debug("LLM response length: %d chars", len(response))
-        #
-        # seeds = self.parse_seeds_from_response(response)
-        # log.info("Parsed %d seeds from LLM response", len(seeds))
-        #
-        # for seed in seeds:
-        #     self.write_seed(seed)
-        #
-        # return len(seeds)
+        prompt = self.build_prompt(stats, interesting, source_context)
+        log.info("Calling LLM (prompt length: %d chars) ...", len(prompt))
+
+        response = self.call_llm(prompt)
+        log.debug("LLM response length: %d chars", len(response))
+
+        seeds = self.parse_seeds_from_response(response)
+        log.info("Parsed %d seeds from LLM response", len(seeds))
+
+        for seed in seeds:
+            self.write_seed(seed)
+
+        return len(seeds)
 
     def run_loop(self, interval_seconds=60):
         """Main loop: generate seeds periodically.
