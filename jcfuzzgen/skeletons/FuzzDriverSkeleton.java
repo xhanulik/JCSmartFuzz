@@ -14,7 +14,12 @@
  *     where input_set = [p1(1) | p2(1) | operation_data]
  *
  * Fuzz input file layout (fixed-offset scheme, AFL++-friendly):
- *   [ins(1) | p1_A(1) | p2_A(1) | len_A(1) | data_A(MAX_DATA) | p1_B(1) | p2_B(1) | len_B(1) | data_B(MAX_DATA)]
+ *   [p1_A(1) | p2_A(1) | len_A(1) | data_A(MAX_DATA) | p1_B(1) | p2_B(1) | len_B(1) | data_B(MAX_DATA)]
+ *
+ * The INS byte is NOT part of the fuzz input. It is pinned at build
+ * time via the FUZZ_INS constant below — a given driver build fuzzes
+ * exactly one operation of the target applet. To fuzz a different
+ * operation, rebuild with a different FUZZ_INS value.
  *
  * Every byte has a stable position regardless of len_A/len_B values.
  * len_A and len_B are clamped to [0, MAX_DATA] and control how many
@@ -40,18 +45,28 @@ public class FuzzDriverSkeleton {
     private static final byte FUZZ_CLA = (byte) 0xB1;
 
     /*=====================================================================*
+     *  GENERATED SECTION: FUZZ_INS                                        *
+     *  Pin this driver to ONE operation of the target applet. The INS     *
+     *  byte is NOT fuzzed — it is a build-time constant so that every     *
+     *  seed AFL++ produces exercises the same handler.                    *
+     *  Must match one of the INS_XXX constants in the fuzzing applet.     *
+     *=====================================================================*/
+
+    private static final byte FUZZ_INS = (byte) 0x00; // {{GENERATED: INS byte of operation under test}}
+
+    /*=====================================================================*
      *  GENERATED SECTION: MAX_DATA                                        *
      *  Set this to the maximum operation data size for the target applet. *
      *  The total fuzz input file size will be:                            *
-     *    HEADER_A(4) + MAX_DATA + HEADER_B(3) + MAX_DATA                  *
-     *  Example: MAX_DATA=64 => 135 bytes per fuzz input                   *
+     *    HEADER_A(3) + MAX_DATA + HEADER_B(3) + MAX_DATA                  *
+     *  Example: MAX_DATA=64 => 134 bytes per fuzz input                   *
      *=====================================================================*/
 
     private static final int MAX_DATA = 64; // {{GENERATED: adjust per target}}
 
     // Derived constants — do not modify
-    private static final int SLOT_B_OFFSET = 4 + MAX_DATA;         // p1_B starts here
-    private static final int TOTAL_INPUT_SIZE = 4 + MAX_DATA + 3 + MAX_DATA;
+    private static final int SLOT_B_OFFSET = 3 + MAX_DATA;         // p1_B starts here
+    private static final int TOTAL_INPUT_SIZE = 3 + MAX_DATA + 3 + MAX_DATA;
 
 
     public static void main(String[] args) {
@@ -77,12 +92,11 @@ public class FuzzDriverSkeleton {
         // This is fine — AFL++ may produce shorter inputs, and zeros are
         // valid data. The fixed-offset layout remains consistent.
 
-        // Step 2: Parse fixed-offset layout
-        // Slot A: [ins(1) | p1_A(1) | p2_A(1) | len_A(1) | data_A(MAX_DATA)]
-        byte ins = input[0];
-        byte p1A = input[1];
-        byte p2A = input[2];
-        int lenA = Math.min(input[3] & 0xFF, MAX_DATA);
+        // Step 2: Parse fixed-offset layout (INS is NOT in the input — it is FUZZ_INS)
+        // Slot A: [p1_A(1) | p2_A(1) | len_A(1) | data_A(MAX_DATA)]
+        byte p1A = input[0];
+        byte p2A = input[1];
+        int lenA = Math.min(input[2] & 0xFF, MAX_DATA);
 
         // Slot B: [p1_B(1) | p2_B(1) | len_B(1) | data_B(MAX_DATA)]
         byte p1B = input[SLOT_B_OFFSET];
@@ -105,7 +119,7 @@ public class FuzzDriverSkeleton {
         // input_set_A: [p1_A | p2_A | data_A(lenA)]
         cdata[off++] = p1A;
         cdata[off++] = p2A;
-        System.arraycopy(input, 4, cdata, off, lenA);
+        System.arraycopy(input, 3, cdata, off, lenA);
         off += lenA;
 
         // input_set_B: [p1_B | p2_B | data_B(lenB)]
@@ -116,7 +130,7 @@ public class FuzzDriverSkeleton {
         // Step 4: Construct CommandAPDU
         CommandAPDU commandAPDU = new CommandAPDU(
                 FUZZ_CLA & 0xFF,  // CLA
-                ins & 0xFF,       // INS
+                FUZZ_INS & 0xFF,  // INS (pinned at build time)
                 0x00,             // P1 (unused at APDU level)
                 0x00,             // P2 (unused at APDU level)
                 cdata             // CDATA with framed dual inputs

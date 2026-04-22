@@ -1,0 +1,104 @@
+# =====================================================================
+#  Fuzz Input Mapping
+#
+#  Driver fuzz input  ->  wrapper/core variables, fields, arrays
+#                         (per operation)
+#
+#  The driver input file contains two mirrored input sets (A and B);
+#  each entry below describes the mapping for ONE input set. The same
+#  mapping applies to A and B — the driver executes the operation twice,
+#  once per set, and the fuzzer compares their timings.
+#
+#  Driver input layout (per input set, MAX_DATA is pinned in the driver):
+#
+#      [ p1(1) | p2(1) | len(1) | data(MAX_DATA) ]
+#
+#  A single driver build is pinned to one INS via FUZZ_INS, so every
+#  seed targets one operation. `data` offsets below are relative to the
+#  first byte of the `data` slot; only the first `len` bytes matter.
+#
+#  Produced per target applet alongside the two Java skeletons.
+# =====================================================================
+
+schema_version: 3
+
+target:
+  applet_class:     # {{GENERATED: fuzzing applet class name}}
+  package:          # {{GENERATED}}
+  fuzz_cla: 0xB1
+  fuzz_ins:         # {{GENERATED: 0xNN — pinned in the driver via FUZZ_INS}}
+  fuzz_ins_name:    # {{GENERATED: INS_XXX symbolic name}}
+  max_data:         # {{GENERATED: matches MAX_DATA in FuzzDriverSkeleton}}
+
+# ---------------------------------------------------------------------
+#  Per-operation mapping
+#
+#  One entry per dispatcher case in FuzzAppletSkeleton.dispatchOperation.
+# ---------------------------------------------------------------------
+operations:
+
+  # ---- TEMPLATE — COPY ONE BLOCK PER OPERATION ------------------------
+  # - ins_name:        # {{GENERATED: INS_XXX}}
+  #   ins_value:       # {{GENERATED: 0xNN}}
+  #   wrapper_method:  # {{GENERATED: wrapXxx}}
+  #   core_method:     # {{GENERATED: coreXxx}}
+  #
+  #   # Which wrapper/core symbol consumes p1 and p2 of the input set.
+  #   p1:
+  #     meaning:       # {{GENERATED: or "unused"}}
+  #     binds_to:      # {{GENERATED: wrapper local / field name, or "-"}}
+  #   p2:
+  #     meaning:
+  #     binds_to:
+  #
+  #   # How the wrapper slices `data` into wrapper/core symbols.
+  #   # Offsets are relative to the first byte of the `data` slot.
+  #   data:
+  #     - name:        # {{GENERATED: descriptive label, e.g., "privkey"}}
+  #       offset:      # {{GENERATED: byte offset within data}}
+  #       size:        # {{GENERATED: bytes, or a symbolic length}}
+  #       binds_to:
+  #         target:    # {{GENERATED: instance field | wrapper local | buffer slice}}
+  #         name:      # {{GENERATED: name used in the wrapper/core code}}
+  #         via:       # {{GENERATED: arrayCopy | setS | setW | setKey | setPIN | direct-read | shift-to-CDATA}}
+  #
+  #   # Output layout that coreXxx() writes to buffer[0..].
+  #   result:
+  #     - { name: , size: }   # {{GENERATED}}
+
+  # {{GENERATED: one filled block per extracted operation}}
+
+# ---------------------------------------------------------------------
+#  Operations the scaffold cannot fuzz (multi-APDU stateful).
+# ---------------------------------------------------------------------
+excluded_operations: []
+  # - { ins_name: , reason: }
+
+# =====================================================================
+#  EXAMPLE (reference only — not part of the schema)
+#
+#  Target:  VERIFY_PIN (INS = 0x20), MAX_DATA = 32
+#  Per-input-set:  p1 = pinLen (1..8), p2 = unused,
+#                  data = reference_pin(8) || guess_pin(8)
+#
+#  Driver `data` slot for one input set:
+#
+#    offset  bytes (hex)                 field
+#    ──────  ──────────────────────────  ─────────────────
+#      0..7  31 32 33 34 00 00 00 00     reference_pin (8)
+#      8..15 31 32 35 34 00 00 00 00     guess_pin (8)
+#     16..31 00 × 16                     ignored (len = 16)
+#
+#  Mapping for that input set:
+#
+#    driver byte             wrapper/core binding          via
+#    ───────────────         ──────────────────────────    ────────────
+#    p1              -->     local   pinLen                direct-read
+#    p2              -->     (unused)                      -
+#    data[0..7]      -->     field   pinBuffer[0..7]       arrayCopy
+#    data[8..15]     -->     buffer[OFFSET_CDATA..+8]      shift-to-CDATA
+#
+#  coreVerifyPin(buffer, pinLen) then compares
+#      pinBuffer[i]  vs  buffer[OFFSET_CDATA + i]
+#  and writes result(1 byte) to buffer[0].
+# =====================================================================

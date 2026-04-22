@@ -18,6 +18,12 @@ The applet has four layers:
 
 Host-side diffuzz driver that feeds the applet via a Java Card simulator (e.g., jCardSim). It reads a fuzz input file produced by AFL++, constructs a `CommandAPDU`, sends it to the simulator, and reports execution cost via Kelinci's `Mem`/`Kelinci` API.
 
+### fuzz_input_mapping_skeleton.yaml
+
+Machine-readable mapping from driver fuzz input to wrapper/core symbols, per operation. For one input set — `[ p1 | p2 | len | data(MAX_DATA) ]` — each operation entry records what `p1`/`p2` mean and how slices of `data` are loaded into instance fields, wrapper locals, or buffer slices of the `wrapXxx()`+`coreXxx()` pair (via `arrayCopy`, `setS`, `setKey`, `shift-to-CDATA`, etc.). The same mapping applies to both input sets A and B.
+
+One YAML is produced per target applet alongside the two filled Java skeletons. Downstream LLM tooling consumes it to synthesize an initial AFL++ seed corpus.
+
 ## Fuzz Input Layout (Fixed-Offset Scheme)
 
 The input file uses a **fixed-offset layout** so that every byte has a stable semantic role regardless of the actual data lengths. This is critical for AFL++ effectiveness — mutations at any position don't shift the meaning of other positions.
@@ -25,20 +31,19 @@ The input file uses a **fixed-offset layout** so that every byte has a stable se
 ```
 Offset  Size       Field
 ──────  ─────────  ─────────────────────────────
-0       1          ins (instruction byte)
-1       1          p1_A
-2       1          p2_A
-3       1          len_A (clamped to MAX_DATA)
-4       MAX_DATA   data_A slot (only first len_A bytes used)
-4+MD    1          p1_B
-5+MD    1          p2_B
-6+MD    1          len_B (clamped to MAX_DATA)
-7+MD    MAX_DATA   data_B slot (only first len_B bytes used)
+0       1          p1_A
+1       1          p2_A
+2       1          len_A (clamped to MAX_DATA)
+3       MAX_DATA   data_A slot (only first len_A bytes used)
+3+MD    1          p1_B
+4+MD    1          p2_B
+5+MD    1          len_B (clamped to MAX_DATA)
+6+MD    MAX_DATA   data_B slot (only first len_B bytes used)
 
-Total: 7 + 2*MAX_DATA bytes  (MD = MAX_DATA)
+Total: 6 + 2*MAX_DATA bytes  (MD = MAX_DATA)
 ```
 
-`MAX_DATA` is a compile-time constant set per target applet (e.g., 32 or 64).
+`MAX_DATA` is a compile-time constant set per target applet (e.g., 32 or 64). The INS byte is also a compile-time constant (`FUZZ_INS`) — a single driver build fuzzes exactly one operation. To fuzz a different operation, rebuild the driver with a different `FUZZ_INS`.
 
 ### Why fixed-offset?
 
@@ -55,13 +60,14 @@ The driver translates the fixed-offset layout into the applet's CDATA framing:
 CDATA = [size_A(2) | p1_A | p2_A | data_A(len_A) | p1_B | p2_B | data_B(len_B)]
 ```
 
-This is wrapped in a `CommandAPDU` with `CLA=0xB1`, the fuzzed `ins` byte, and `P1=P2=0x00`.
+This is wrapped in a `CommandAPDU` with `CLA=0xB1`, `INS=FUZZ_INS` (build-time constant), and `P1=P2=0x00`.
 
 ## Code Generation
 
 Both skeletons contain `{{GENERATED: ...}}` markers where LLM-extracted code is inserted for a specific target applet. The extraction process is described in `llm_extraction_prompt.md`.
 
 **Driver-specific generated sections:**
+- `FUZZ_INS` — INS byte of the single operation this driver build fuzzes
 - `MAX_DATA` — sized to the target operation's expected data
 - `APPLET_AID` — AID of the fuzzing applet on the simulator
 - Simulator initialization (install + select applet)
