@@ -471,7 +471,6 @@ def print_report(m):
         print(f"  Rows: {pc['rows']}")
         _print_stat_block("Instructions", pc["instructions"])
         _print_stat_block("Time",         pc["time"])
-        _print_stat_block("Memory",       pc["memory"])
         print()
         print("  User-defined cost — timing side-channel assessment")
         print("  " + "-" * 50)
