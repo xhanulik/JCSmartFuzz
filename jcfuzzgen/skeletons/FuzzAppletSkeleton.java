@@ -24,6 +24,8 @@
 
 package /* GENERATED: set package name */;
 
+import edu.cmu.sv.kelinci.Kelinci;
+import edu.cmu.sv.kelinci.Mem;
 import javacard.framework.APDU;
 import javacard.framework.ISO7816;
 import javacard.framework.ISOException;
@@ -81,6 +83,8 @@ public class /* GENERATED: set class name */ extends javacard.framework.Applet {
 
     // Fuzz buffer — preserves dual inputs and stores intermediate results during dual-invocation
     private byte[] fuzzBuffer;
+    // Carries the Mem.instrCost measured around the last coreXxx() call out to process()
+    private long lastCoreCost;
 
     /*=====================================================================*
      *  GENERATED SECTION: Instance fields                                  *
@@ -179,6 +183,7 @@ public class /* GENERATED: set class name */ extends javacard.framework.Applet {
         buffer[ISO7816.OFFSET_LC] = (byte)(dataLenA & 0xFF);
 
         short lenA = dispatchOperation(ins, apdu, buffer);
+        long costA = lastCoreCost;
         if (lenA > 0)
             Util.arrayCopyNonAtomic(buffer, (short) 0,
                     fuzzBuffer, FUZZ_RESULT_A_OFFSET, lenA);
@@ -193,9 +198,12 @@ public class /* GENERATED: set class name */ extends javacard.framework.Applet {
         buffer[ISO7816.OFFSET_LC] = (byte)(dataLenB & 0xFF);
 
         short lenB = dispatchOperation(ins, apdu, buffer);
+        long costB = lastCoreCost;
         if (lenB > 0)
             Util.arrayCopyNonAtomic(buffer, (short) 0,
                     fuzzBuffer, FUZZ_RESULT_B_OFFSET, lenB);
+
+        Kelinci.addCost(Math.abs(costA - costB));
 
         // ---- BUILD RESPONSE ----
         // Response = [len_A(2) | result_A(len_A) | len_B(2) | result_B(len_B)]
@@ -251,7 +259,10 @@ public class /* GENERATED: set class name */ extends javacard.framework.Applet {
      *    1. Reads P1, P2, and operation_data from buffer                      *
      *    2. Validates input sizes                                             *
      *    3. Loads keys into instance fields, populates working buffers        *
-     *    4. Calls the corresponding coreXxx() method                          *
+     *    4. Measures instruction cost around the core call:                   *
+     *         Mem.clear();                                                    *
+     *         coreXxx();                                                      *
+     *         lastCoreCost = Mem.instrCost;                                   *
      *    5. Formats output in buffer[0..] and returns the output size         *
      *                                                                         *
      ***************************************************************************/

@@ -8,6 +8,7 @@ Java or if you need custom extraction.
 See ``__main__.py`` for the CLI entry point.
 """
 
+import hashlib
 import json
 import logging
 import os
@@ -26,6 +27,33 @@ log = logging.getLogger(__name__)
 E_INFRA_ENDPOINT = "https://llm.ai.e-infra.cz/v1/chat/completions"
 E_INFRA_DEFAULT_MODEL = "gpt-oss-120b"
 E_INFRA_TIMEOUT_SECONDS = 120
+
+
+def _parse_ab_halves(content):
+    """Parse the fixed-offset A/B input layout from a queue entry's bytes.
+
+    Layout: [ p1_A(1) | p2_A(1) | len_A(1) | data_A(MAX_DATA)
+             | p1_B(1) | p2_B(1) | len_B(1) | data_B(MAX_DATA) ]
+
+    MAX_DATA is inferred as (len(content) - 6) // 2.
+
+    Returns a dict with p1_A/B, p2_A/B, len_A/B, or None if content is
+    too short to parse.
+    """
+    if len(content) < 6:
+        return None
+    max_data = (len(content) - 6) // 2
+    slot_b = 3 + max_data
+    if slot_b + 2 >= len(content):
+        return None
+    return {
+        "p1_A":  content[0],
+        "p2_A":  content[1],
+        "len_A": content[2],
+        "p1_B":  content[slot_b],
+        "p2_B":  content[slot_b + 1],
+        "len_B": content[slot_b + 2],
+    }
 
 
 def _format_hex(data, bytes_per_line=16):
@@ -51,7 +79,8 @@ class LLMSeedGenerator:
     """
 
     def __init__(self, source_code_path, afl_out_dir, seed_output_dir,
-                 op_name=None, model=E_INFRA_DEFAULT_MODEL, api_token=None):
+                 op_name=None, model=E_INFRA_DEFAULT_MODEL, api_token=None,
+                 print_prompt=False, llm_timeout=E_INFRA_TIMEOUT_SECONDS):
         """
         Args:
             source_code_path: Path to the target applet .java source file.
@@ -76,7 +105,26 @@ class LLMSeedGenerator:
         self.seeds_accepted = 0
         self.model = model
         self.api_token = api_token or os.environ.get("LLM_API_TOKEN")
+        self.print_prompt = print_prompt
+        self.llm_timeout = llm_timeout
         os.makedirs(seed_output_dir, exist_ok=True)
+
+        # Deduplication: hashes of seeds already written (pre-populated from
+        # existing files so restarts don't re-write the same seeds).
+        self._seen_hashes: set = set()
+        for fname in os.listdir(seed_output_dir):
+            fpath = os.path.join(seed_output_dir, fname)
+            if os.path.isfile(fpath):
+                try:
+                    with open(fpath, "rb") as f:
+                        self._seen_hashes.add(hashlib.sha256(f.read()).digest())
+                except OSError:
+                    pass
+
+        # Acceptance-rate tracking across generation cycles.
+        self._last_acceptance_rate: float = 0.0
+        self._seed_counter_prev: int = 0
+        self._seeds_accepted_prev: int = 0
 
     # ==================================================================
     # Has a working default via SourceReader -- override to customise.
@@ -146,7 +194,7 @@ class LLMSeedGenerator:
         )
 
         try:
-            with urllib.request.urlopen(req, timeout=E_INFRA_TIMEOUT_SECONDS) as resp:
+            with urllib.request.urlopen(req, timeout=self.llm_timeout) as resp:
                 payload = json.loads(resp.read().decode("utf-8"))
         except urllib.error.HTTPError as e:
             err_body = e.read().decode("utf-8", errors="replace")
@@ -154,6 +202,10 @@ class LLMSeedGenerator:
                 f"LLM API HTTP {e.code} {e.reason}: {err_body}") from e
         except urllib.error.URLError as e:
             raise RuntimeError(f"LLM API network error: {e.reason}") from e
+        except TimeoutError as e:
+            raise RuntimeError(
+                f"LLM API timed out after {self.llm_timeout}s "
+                f"(increase --timeout for slow models)") from e
 
         choices = payload.get("choices") or []
         if not choices:
@@ -166,10 +218,11 @@ class LLMSeedGenerator:
     # Tailoring these to your target will significantly improve results.
     # ==================================================================
 
-    # Scoring weights for non-original queue entries.  The tuple order
-    # is (coverage-increasing flag, instructions hit); sorted descending,
-    # so +cov entries outrank non-+cov entries regardless of instruction
-    # count, and among equals the higher instruction count wins.
+    # Scoring weights for non-original queue entries.  The tuple order is
+    # (coverage-increasing flag, instructions, time, user_defined, len_diff,
+    # param_diff); sorted descending, so +cov entries always outrank non-+cov
+    # ones, then by instruction count, wall-clock time, user-defined cost, and
+    # finally a bonus for entries whose A/B halves already differ structurally.
     def score_queue_entry(self, entry):
         """Return a sort key for ranking non-original queue entries.
 
@@ -177,7 +230,18 @@ class LLMSeedGenerator:
         user-defined cost).  Originals are never scored -- they are
         always included unconditionally.
         """
-        return (1 if entry["is_cov"] else 0, entry["instructions"])
+        ab = entry.get("ab") or {}
+        len_diff  = abs(ab.get("len_A", 0) - ab.get("len_B", 0))
+        param_diff = int(ab.get("p1_A", 0) != ab.get("p1_B", 0) or
+                         ab.get("p2_A", 0) != ab.get("p2_B", 0))
+        return (
+            1 if entry["is_cov"] else 0,
+            entry["instructions"],
+            entry.get("time", 0),
+            entry.get("user_defined", 0),
+            len_diff,
+            param_diff,
+        )
 
     def select_interesting_inputs(self, max_entries=10):
         """Select queue entries to show to the LLM.
@@ -192,7 +256,8 @@ class LLMSeedGenerator:
 
         Returns:
             list[dict]: Each dict has keys ``filename``, ``content``,
-                ``instructions``, ``is_original``, ``is_cov``, ``op``.
+                ``instructions``, ``time``, ``user_defined``,
+                ``is_original``, ``is_cov``, ``op``, ``ab``.
         """
         if not self.stats_reader.instance_dir:
             return []
@@ -222,9 +287,12 @@ class LLMSeedGenerator:
                 "filename":     fname,
                 "content":      content,
                 "instructions": cost.get("instructions", 0),
+                "time":         cost.get("time", 0),
+                "user_defined": cost.get("user_defined", 0),
                 "is_original":  meta["is_original"],
                 "is_cov":       meta["is_cov"],
                 "op":           meta["op"],
+                "ab":           _parse_ab_halves(content),
             })
 
         originals = [e for e in entries if e["is_original"]]
@@ -249,12 +317,28 @@ class LLMSeedGenerator:
                 input_n += 1
                 header = f"Input {input_n}:"
             cov = "YES" if (e["is_cov"] or e["is_original"]) else "NO"
+            ab = e.get("ab")
+            if ab:
+                p1_rel = "DIFFER" if ab["p1_A"] != ab["p1_B"] else "same"
+                p2_rel = "DIFFER" if ab["p2_A"] != ab["p2_B"] else "same"
+                ab_line = (
+                    f"A/B diff: "
+                    f"p1=0x{ab['p1_A']:02X}/0x{ab['p1_B']:02X} ({p1_rel})  "
+                    f"p2=0x{ab['p2_A']:02X}/0x{ab['p2_B']:02X} ({p2_rel})  "
+                    f"len={ab['len_A']}/{ab['len_B']} "
+                    f"(delta={abs(ab['len_A'] - ab['len_B'])})\n"
+                )
+            else:
+                ab_line = ""
             blocks.append(
                 f"{header}\n"
                 f"Length: {len(e['content'])}\n"
                 f"Instructions: {e['instructions']}\n"
+                f"Time: {e.get('time', 0)}\n"
+                f"User-defined cost: {e.get('user_defined', 0)}\n"
                 f"Discovered via: {e['op'] or 'unknown'}\n"
                 f"Coverage-increasing: {cov}\n"
+                f"{ab_line}"
                 f"Hex encoded fuzzing input:\n"
                 f"{_format_hex(e['content'])}"
             )
@@ -285,13 +369,69 @@ class LLMSeedGenerator:
 
         inputs_section = self.format_interesting_inputs(interesting_inputs)
 
+        # --- Fuzzer state section (enhancement 2) ---
+        bitmap_cvg  = stats.get("bitmap_cvg",  "?")
+        cycles_done = stats.get("cycles_done", "?")
+        corpus_count= stats.get("corpus_count","?")
+        edges_found = stats.get("edges_found", "?")
+        try:
+            last_find_age = int(time.time()) - int(stats["last_find"])
+            last_find_str = f"{last_find_age // 60}m {last_find_age % 60}s ago"
+        except (KeyError, ValueError):
+            last_find_str = "unknown"
+
+        try:
+            cycles_int   = int(cycles_done)
+            coverage_pct = float(str(bitmap_cvg).rstrip("%"))
+            if cycles_int > 5 and coverage_pct < 5.0:
+                coverage_hint = (
+                    "Coverage has been low for many cycles. "
+                    "Focus on unexplored edge-case byte values and rarely-taken branches."
+                )
+            else:
+                coverage_hint = (
+                    "Diversify the structural variety of inputs across different "
+                    "p1, p2, and len combinations."
+                )
+        except (ValueError, TypeError):
+            coverage_hint = "Diversify inputs across different p1, p2, and len combinations."
+
+        fuzzer_state_section = (
+            f"Cycles completed: {cycles_done}\n"
+            f"Edges found: {edges_found}  (bitmap coverage: {bitmap_cvg})\n"
+            f"Corpus size: {corpus_count}\n"
+            f"Last new path: {last_find_str}\n"
+            f"Guidance: {coverage_hint}"
+        )
+
+        # --- Acceptance-rate feedback (enhancement 6) ---
+        rate = self._last_acceptance_rate
+        if rate > 0:
+            acceptance_feedback = (
+                f"Last generation cycle: {rate * 100:.0f}% of generated seeds "
+                f"were accepted into the AFL++ queue."
+            )
+            if rate < 0.15:
+                acceptance_feedback += (
+                    " Acceptance is low — try more structurally varied inputs."
+                )
+        else:
+            acceptance_feedback = ""
+
         prompt = f"""\
-You are a fuzzing expert.  Generate new test inputs for a Java Card
-applet that will explore uncovered code paths and expose timing
-side-channel differences between input sets A and B.
+You are a fuzzing expert specialising in timing side-channel detection.
+Your goal is to generate test inputs that cause execution paths A and B
+inside the Java Card applet to diverge — visiting different branches and
+producing different instruction counts — so that a timing side-channel
+can be observed.
 
 === 1. Fuzzing input format received by driver ===
 {input_format}
+
+Each input encodes TWO independent invocations of the same operation.
+The applet executes the operation once with (p1_A, p2_A, len_A, data_A)
+and once with (p1_B, p2_B, len_B, data_B) under identical applet state.
+A side-channel exists when the two executions take different code paths.
 
 === 2. Mapping of one fuzzing input to the actual values ===
 {input_mapping}
@@ -299,17 +439,22 @@ side-channel differences between input sets A and B.
 === 3. Fuzzed source code ===
 {source_context}
 
-=== 4. AFL++ interesting inputs ===
+=== 4. AFL++ fuzzer state ===
+{fuzzer_state_section}
+
+=== 5. AFL++ interesting inputs ===
 {inputs_section}
 
 === Instructions ===
 Generate new test inputs that follow the exact byte layout shown in
-section 1.  Prefer inputs that:
-- Exercise code paths not covered by the seeds/inputs above.
-- Drive A and B down divergent branches to surface timing leaks.
+section 1.  Examine the conditional branches in the core method (section 3)
+that depend on p1, p2, len, or the data content.  Construct A and B halves
+that enter opposite branches of those conditions so the two executions
+diverge.  Also:
 - Explore edge values of p1, p2, and len (including len == 0 and
   len == MAX_DATA).
-
+- Cover code paths not yet reached by the inputs in section 5.
+{f"- {acceptance_feedback}" if acceptance_feedback else ""}
 Return ONLY the raw hex-encoded test inputs, one per line.  No prose,
 no code fences, no commentary."""
 
@@ -374,6 +519,12 @@ no code fences, no commentary."""
         Args:
             data: Seed content as bytes.
         """
+        h = hashlib.sha256(data).digest()
+        if h in self._seen_hashes:
+            log.debug("Skipping duplicate seed (%d bytes)", len(data))
+            return
+        self._seen_hashes.add(h)
+
         fname = f"llm_seed_{self.seed_counter:06d}"
         path = os.path.join(self.seed_output_dir, fname)
         with open(path, "wb") as f:
@@ -393,12 +544,10 @@ no code fences, no commentary."""
         if not self.stats_reader.instance_dir:
             return 0
         queue_dir = os.path.join(self.stats_reader.instance_dir, "queue")
-        # Foreign sync entries contain the directory name in the filename
-        dir_name = os.path.basename(self.seed_output_dir.rstrip("/"))
         count = 0
         try:
             for entry in os.listdir(queue_dir):
-                if dir_name in entry:
+                if "sync" in entry:
                     count += 1
         except OSError:
             pass
@@ -424,6 +573,10 @@ no code fences, no commentary."""
 
         prompt = self.build_prompt(stats, interesting, source_context)
         log.info("Calling LLM (prompt length: %d chars) ...", len(prompt))
+        if self.print_prompt:
+            print("\n" + "=" * 72)
+            print(prompt)
+            print("=" * 72 + "\n")
 
         response = self.call_llm(prompt)
         log.debug("LLM response length: %d chars", len(response))
@@ -436,34 +589,60 @@ no code fences, no commentary."""
 
         return len(seeds)
 
-    def run_loop(self, interval_seconds=60):
+    def run_loop(self, interval_seconds=60, duration_seconds=None):
         """Main loop: generate seeds periodically.
 
         Args:
             interval_seconds: Seconds between generation cycles.
+            duration_seconds: Stop after this many seconds have elapsed since
+                the first cycle started.  ``None`` means run indefinitely.
+                Set to the same value as AFL++'s ``-V`` flag so both processes
+                finish together.
         """
         log.info("LLM seed generator started")
         log.info("  Source: %s", self.source_code_path)
         log.info("  AFL++ output dir: %s", self.stats_reader.out_dir)
         log.info("  Seed output dir: %s", self.seed_output_dir)
+        log.info("  Model: %s", self.model)
+        log.info("  LLM timeout: %ds", self.llm_timeout)
         log.info("  Interval: %ds", interval_seconds)
+        if duration_seconds is not None:
+            log.info("  Duration: %ds", duration_seconds)
 
         # Wait for AFL++ to start
         if not self.stats_reader.wait_for_fuzzer():
             log.error("AFL++ did not start within timeout. Exiting.")
             sys.exit(1)
 
+        start_time = time.time()
+
         while True:
+            if duration_seconds is not None:
+                if time.time() - start_time >= duration_seconds:
+                    log.info("Duration limit reached. Total seeds written: %d",
+                             self.seed_counter)
+                    break
+
             try:
                 t0 = time.time()
                 n = self.run_once()
                 elapsed = time.time() - t0
 
                 accepted = self.check_accepted_seeds()
+
+                delta_written  = self.seed_counter - self._seed_counter_prev
+                delta_accepted = accepted - self._seeds_accepted_prev
+                if delta_written > 0:
+                    self._last_acceptance_rate = delta_accepted / delta_written
+                self._seed_counter_prev  = self.seed_counter
+                self._seeds_accepted_prev = accepted
+
                 log.info(
                     "Generated %d seeds in %.1fs "
-                    "(total written: %d, accepted by AFL++: %d)",
-                    n, elapsed, self.seed_counter, accepted)
+                    "(total written: %d, accepted by AFL++: %d, "
+                    "cycle acceptance: %.0f%%)",
+                    n, elapsed, self.seed_counter, accepted,
+                    self._last_acceptance_rate * 100)
 
             except KeyboardInterrupt:
                 log.info("Interrupted. Total seeds written: %d",
@@ -472,4 +651,12 @@ no code fences, no commentary."""
             except Exception:
                 log.exception("Error in generation cycle")
 
-            time.sleep(interval_seconds)
+            if duration_seconds is not None:
+                remaining = duration_seconds - (time.time() - start_time)
+                if remaining <= 0:
+                    log.info("Duration limit reached. Total seeds written: %d",
+                             self.seed_counter)
+                    break
+                time.sleep(min(interval_seconds, remaining))
+            else:
+                time.sleep(interval_seconds)

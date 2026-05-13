@@ -34,18 +34,72 @@ Inputs the generator needs:
 * `--model` — LLM name/alias on the e-INFRA CZ endpoint
 * `LLM_API_TOKEN` env var — Bearer token
 
+## Usage Examples
+
+All commands must be run from the `jcfuzzgen/` directory so that `llm_seed_generator` is on the Python path:
+```bash
+cd jcfuzzgen
+```
+
+**List available models on the e-INFRA CZ endpoint:**
+```bash
+export LLM_API_TOKEN=<your-token>
+python3 -m llm_seed_generator --list-models
+```
+
+**Basic run with the default model (`gpt-oss-120b`):**
+```bash
+export LLM_API_TOKEN=<your-token>
+python3 -m llm_seed_generator \
+    --source /path/to/MyApplet.java \
+    --op-name VerifyPin \
+    --afl-out /tmp/afl-out \
+    --seed-dir /tmp/llm-seeds
+```
+
+**With a recommended coding-focused model and verbose logging:**
+```bash
+export LLM_API_TOKEN=<your-token>
+python3 -m llm_seed_generator \
+    --source /path/to/MyApplet.java \
+    --op-name VerifyPin \
+    --afl-out /tmp/afl-out \
+    --seed-dir /tmp/llm-seeds \
+    --model qwen3-coder-next \
+    --verbose
+```
+
+**With a thinking/reasoning model and a longer generation interval:**
+```bash
+export LLM_API_TOKEN=<your-token>
+python3 -m llm_seed_generator \
+    --source /path/to/MyApplet.java \
+    --op-name VerifyPin \
+    --afl-out /tmp/afl-out \
+    --seed-dir /tmp/llm-seeds \
+    --model deepseek-v4-pro-thinking \
+    --interval 120
+```
+
+AFL++ must be running with `-M main -F /tmp/llm-seeds` before or alongside the generator. Set `AFL_SYNC_TIME=1` for faster seed pickup (~30 s).
+
 ## One Generation Cycle
 
-LLMSeedGenerator.run_once() does these steps in order:
+`LLMSeedGenerator.run_once()` does these steps in order:
 
-1. **Read fuzzer state** — `AFLStatsReader.read_stats()` parses fuzzer_stats.
-2. **Select interesting inputs** — `select_interesting_inputs()` pulls queue entries, parses their filenames via `parse_queue_name()` (flags `+cov`, initial-seed vs. mutated, discovering operator), joins them with per-entry cost from path_costs.csv, sorts non-originals by `score_queue_entry()` = (`is_cov`, `instructions`). All originals included unconditionally.
-3. **Read source context** — `read_source_context()` returns either the wrapXxx + coreXxx pair (if `--op-name` set) or the whole class.
-4. **Build prompt** — `build_prompt()` assembles four sections: input byte layout, input-to-APDU mapping, source code, AFL++-selected inputs (hex-encoded). Ends with explicit instructions to emit hex-encoded inputs one per line.
-5. **Call the LLM** — `call_llm()`  is OpenAI-compatible, with Authorization: Bearer. Raises RuntimeError on missing token / HTTP error / empty response.
-6. **Parse response** — `parse_seeds_from_response()` strips markdown fences, 0x prefixes, bullets; keeps only valid hex pairs; yields `list[bytes]`.
-7. **Write seeds** — `write_seed()` writes each parsed seed to `--seed-dir` as `llm_seed_%06d`. AFL++ imports by mtime, so unique filenames + fresh mtimes are what matters.
-8. **`run_loop()`** wraps the above in a while True with time.sleep(--interval) between iterations. At startup it calls `stats_reader.wait_for_fuzzer()` so the first cycle only runs after AFL++ has created `fuzzer_stats`. Each iteration also logs how many of the generator's seeds AFL++ has actually imported, counted via `check_accepted_seeds()` (queue entries whose filename contains `sync:<seed-dir-basename>`).
+1. **Read fuzzer state** — `AFLStatsReader.read_stats()` parses `fuzzer_stats`.
+2. **Select interesting inputs** — `select_interesting_inputs()` pulls queue entries and ranks non-originals by `score_queue_entry()`. All originals are included unconditionally. Non-originals are sorted descending by: `+cov` flag → instruction count → wall-clock time → user-defined cost → A/B length delta → A/B parameter diff. Top 10 non-originals are kept.
+3. **Read source context** — `read_source_context()` returns either the `wrapXxx` + `coreXxx` pair (if `--op-name` set) or the whole class.
+4. **Build prompt** — `build_prompt()` assembles five sections:
+   - Input byte layout and input-to-APDU mapping
+   - Fuzzed source code
+   - AFL++ fuzzer state (cycles done, edges found, bitmap coverage, corpus size, time since last new path, coverage-guided hint)
+   - Selected queue inputs — for each: hex dump, length, instruction count, wall-clock time, user-defined cost, mutation operator, coverage flag, and A/B structural diff (p1/p2/len for both halves)
+   - Instructions to the LLM — focused on constructing A/B pairs that enter opposite branches; includes per-cycle acceptance-rate feedback if available
+5. **Call the LLM** — `call_llm()` uses the OpenAI-compatible endpoint with `Authorization: Bearer`. Raises `RuntimeError` on missing token, HTTP error, or empty response.
+6. **Parse response** — `parse_seeds_from_response()` strips markdown fences, `0x` prefixes, and bullet markers; keeps only valid even-length hex strings; returns `list[bytes]`.
+7. **Write seeds** — `write_seed()` computes a SHA-256 hash and skips duplicates (including seeds from previous runs, pre-loaded at startup). New seeds are written to `--seed-dir` as `llm_seed_%06d`.
+8. **`run_loop()`** wraps the above in a `while True` with `time.sleep(--interval)` between iterations. At startup it calls `stats_reader.wait_for_fuzzer()` so the first cycle only runs after AFL++ has created `fuzzer_stats`. After each cycle it computes the per-cycle acceptance rate (fraction of written seeds AFL++ imported) and logs it alongside total written and accepted counts.
 
 ## AFL++ Integration Contract
 
@@ -62,9 +116,19 @@ LLMSeedGenerator.run_once() does these steps in order:
   * [x] New seeds based on `queue/` input
 * LLM seed generation sources:
   * [x] Seeds with number of instructions reached
-  * [ ] Seeds with user-defined cost
+  * [x] Seeds with user-defined cost
   * [x] Seeds with increased coverage
+  * [x] Source code
   * [ ] Already generated seeds
+  * [ ] Machine code (instructions, bytecode, CAP files)
+* Input selection quality:
+  * [x] A/B structural divergence signal (p1/p2/len diff between halves)
+  * [x] Wall-clock time from `path_costs.csv` used in ranking
+  * [x] Seed deduplication via SHA-256 (across runs)
+* Prompt quality:
+  * [x] Fuzzer state injected into prompt (coverage, cycles, last find)
+  * [x] Per-cycle acceptance-rate feedback to LLM
+  * [x] Differential/timing side-channel objective stated explicitly
 * AFL++:
   * [ ] More frequent sync with generated seeds
   * [ ] Rotate power schedule during fuzzing process
