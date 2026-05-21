@@ -108,33 +108,3 @@ AFL++ must be running with `-M main -F /tmp/llm-seeds` before or alongside the g
 * The generator must not delete or modify seeds it already wrote — AFL's mtime cursor would either miss them or re-import stale copies.
 * AFL's sync cadence is controlled by `AFL_SYNC_TIME` (minutes, default 20, halved for -M). Set AFL_SYNC_TIME=1 for ~30-second pickup.
 * Seeds of size 0 or > 1 MiB are silently dropped by AFL; write_seed() relies on the caller producing reasonable sizes.
-
-## Features
-
-* Basic functionality:
-  * [x] Seed injection into fuzzing process
-  * [x] New seeds based on `queue/` input
-* LLM seed generation sources:
-  * [x] Seeds with number of instructions reached
-  * [x] Seeds with user-defined cost
-  * [x] Seeds with increased coverage
-  * [x] Source code
-  * [ ] Already generated seeds
-  * [ ] Machine code (instructions, bytecode, CAP files)
-* Input selection quality:
-  * [x] A/B structural divergence signal (p1/p2/len diff between halves)
-  * [x] Wall-clock time from `path_costs.csv` used in ranking
-  * [x] Seed deduplication via SHA-256 (across runs)
-* Prompt quality:
-  * [x] Fuzzer state injected into prompt (coverage, cycles, last find)
-  * [x] Per-cycle acceptance-rate feedback to LLM
-  * [x] Differential/timing side-channel objective stated explicitly
-* AFL++:
-  * [ ] More frequent sync with generated seeds
-  * [ ] Rotate power schedule during fuzzing process
-* Other:
-  * [ ] Mutation strategies enhancement
-  * [ ] Periodical minimization of generated seeds
-  * [ ] Seed generation based on path exploration
-  * [ ] Dictionary generation
-  * [ ] Custom mutators via shared libraries
