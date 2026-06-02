@@ -18,11 +18,9 @@ The applet has four layers:
 
 Host-side diffuzz driver that feeds the applet via a Java Card simulator (e.g., jCardSim). It reads a fuzz input file produced by AFL++, constructs a `CommandAPDU`, sends it to the simulator, and reports execution cost via Kelinci's `Mem`/`Kelinci` API.
 
-### fuzz_input_mapping_skeleton.yaml
+### llm_extraction_prompt.md
 
-Machine-readable mapping from driver fuzz input to wrapper/core symbols, per operation. For one input set — `[ p1 | p2 | len | data(MAX_DATA) ]` — each operation entry records what `p1`/`p2` mean and how slices of `data` are loaded into instance fields, wrapper locals, or buffer slices of the `wrapXxx()`+`coreXxx()` pair (via `arrayCopy`, `setS`, `setKey`, `shift-to-CDATA`, etc.). The same mapping applies to both input sets A and B.
-
-One YAML is produced per target applet alongside the two filled Java skeletons. Downstream LLM tooling consumes it to synthesize an initial AFL++ seed corpus.
+LLM prompt for extracting timing-sensitive operations from a target Java Card applet. Given the full applet source, it instructs the LLM to identify operations that process secret data with data-dependent timing, then produce the wrapper + core method pairs, field declarations, constants, and dispatcher entries needed to fill in the `{{GENERATED: ...}}` markers in both skeletons.
 
 ## Fuzz Input Layout (Fixed-Offset Scheme)
 
@@ -64,7 +62,7 @@ This is wrapped in a `CommandAPDU` with `CLA=0xB1`, `INS=FUZZ_INS` (build-time c
 
 ## Code Generation
 
-Both skeletons contain `{{GENERATED: ...}}` markers where LLM-extracted code is inserted for a specific target applet. The extraction process is described in `llm_extraction_prompt.md`.
+Both skeletons contain `{{GENERATED: ...}}` markers where LLM-extracted code is inserted for a specific target applet. Feed the target applet's source to the LLM using the prompt in `llm_extraction_prompt.md`, then paste each numbered output section into the corresponding marker.
 
 **Driver-specific generated sections:**
 - `FUZZ_INS` — INS byte of the single operation this driver build fuzzes
