@@ -1,10 +1,10 @@
 # drivergen — FuzzDriver Generator
 
 Generates `FuzzDriverXxx.java` files from a fuzzing applet that conforms to
-`FuzzAppletSkeleton.java` (`jcfuzzgen/skeletons/`).
+`FuzzAppletSkeleton.java` (`skeletons/`).
 
 After creating a fuzzing applet (manually or with the LLM prompts in
-`jcfuzzgen/skeletons/`), run this script instead of writing each driver by hand.
+`skeletons/`), run this script instead of writing each driver by hand.
 
 ## Requirements
 
@@ -26,22 +26,22 @@ python generate_drivers.py --applet PATH [--output-dir DIR] [--aid STRING]
 
 ```
 python generate_drivers.py \
-    --applet ../SatochipApplet/src/org/satochip/applet/SatochipFuzzApplet.java \
-    --output-dir ../SatochipApplet/src/org/satochip/applet/
+    --applet path/to/MyCardFuzzApplet.java \
+    --output-dir path/to/output/
 ```
 
-Expected output:
+Expected output (structure varies by applet):
 ```
-Parsed applet : SatochipFuzzApplet  (package org.satochip.applet)
-FUZZ_CLA      : 0xb1  AID: "SatochipFuzz"
+Parsed applet : MyCardFuzzApplet  (package com.example.applet)
+FUZZ_CLA      : 0xb1  AID: "MyCardFuzz"
 Operations found:
-  INS_BIP32_DERIVE       0x01  wrapBIP32Derive           MAX_DATA=4
-  INS_HMAC_SHA160        0x02  wrapHmacSha160            MAX_DATA=64
-  INS_HMAC_SHA512        0x03  wrapHmacSha512            MAX_DATA=64
+  INS_SIGN_HASH          0x10  wrapSignHash              MAX_DATA=32
+  INS_VERIFY_PIN         0x20  wrapVerifyPin             MAX_DATA=8
+  INS_DERIVE_KEY         0x30  wrapDeriveKey             MAX_DATA=64
 Generated:
-  FuzzDriverBIP32Derive.java               (14 bytes per fuzz input)
-  FuzzDriverHmacSha160.java                (134 bytes per fuzz input)
-  FuzzDriverHmacSha512.java                (134 bytes per fuzz input)
+  FuzzDriverSignHash.java                  (70 bytes per fuzz input)
+  FuzzDriverVerifyPin.java                 (22 bytes per fuzz input)
+  FuzzDriverDeriveKey.java                 (134 bytes per fuzz input)
 ```
 
 ## What the Script Parses
@@ -53,16 +53,6 @@ The applet source is parsed for:
 - **`dispatchOperation()` switch** — maps each `INS_*` name to its wrapper method
 - **`MAX_DATA`** per wrapper — searched first in the wrapper's Javadoc comment
   (`MAX_DATA = N`), then in the `if (dataLen < (short) N)` guard inside the body
-
-## How Driver Class Names Are Derived
-
-The `wrap` prefix is stripped from the wrapper method name:
-
-| Wrapper method | Generated driver class |
-|----------------|------------------------|
-| `wrapBIP32Derive` | `FuzzDriverBIP32Derive` |
-| `wrapHmacSha160` | `FuzzDriverHmacSha160` |
-| `wrapVerifyPin` | `FuzzDriverVerifyPin` |
 
 ## Conformance Requirements
 

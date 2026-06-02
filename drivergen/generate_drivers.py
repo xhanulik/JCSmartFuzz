@@ -40,14 +40,18 @@ def extract_method_region(source: str, method_name: str) -> str:
     present) plus the full body of the first method named *method_name*.
     Uses brace-depth tracking so nested braces are handled correctly.
     """
-    # Find the method signature (method_name followed by '(' somewhere on the
-    # same logical line, preceded by optional modifiers / return type).
+    # Find the method declaration (not a call site).  The pattern anchors to the
+    # start of a line so that a call like "wrapFoo(..." inside a switch/if body
+    # is never mistaken for the declaration.
     sig_pattern = re.compile(
         r'(/\*\*.*?\*/\s*)?'          # optional Javadoc block
-        r'(?:[\w\[\]<>,\s]+\s+)'      # return type + modifiers (greedy)
+        r'^[ \t]*'                    # line start (MULTILINE anchor)
+        r'(?:(?:public|private|protected|static|final|synchronized|'
+        r'abstract|native|default|void|short|byte|int|boolean|long)'
+        r'[ \t\w\[\]<>,]*[ \t]+)+'   # one or more modifier/return-type tokens
         r'\b' + re.escape(method_name) + r'\b'
         r'\s*\(',
-        re.DOTALL
+        re.MULTILINE | re.DOTALL
     )
     m = sig_pattern.search(source)
     if m is None:
@@ -311,7 +315,7 @@ def driver_class_name(wrapper_name: str) -> str:
 
 
 def derive_aid(class_name: str) -> str:
-    """SatochipFuzzApplet -> 'SatochipFuzz'  (strip trailing 'Applet')"""
+    """MyCardFuzzApplet -> 'MyCardFuzz'  (strip trailing 'Applet')"""
     if class_name.endswith('Applet'):
         return class_name[:-len('Applet')]
     return class_name
