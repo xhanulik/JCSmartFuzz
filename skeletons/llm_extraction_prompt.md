@@ -25,11 +25,19 @@ Read the applet's `process()` method and its INS dispatch logic. For every INS h
 - The line range of the handler method in the source
 - A brief explanation of **why** this operation is timing-sensitive (what secret data it touches and what timing-variable construct it uses)
 
+#### What is timing-sensitive/secret data
+
+Use the following data description as definition of secret data in the code:
+
+- symmetric/asymmetric keys
+- PIN value
+- intermediate crypto results
+
 #### What makes an operation timing-sensitive
 
 An operation is a candidate if it processes secret/private data **and** contains one or more of these constructs:
 
-- **Secret-dependent branching**: `if`/`switch`/`?:` statements where the condition depends on secret data (key bytes, PIN values, intermediate crypto results). Different branches may take different amounts of time.
+- **Secret-dependent branching**: `if`/`switch`/`?:` statements where the condition depends on secret data. Different branches may take different amounts of time.
 - **Secret-dependent loop bounds**: Loops whose iteration count depends on secret data (e.g., scanning for a zero byte in a key, finding the length of a variable-length secret).
 - **Early-exit comparisons**: Byte-by-byte comparisons (PIN checks, MAC verification, signature verification) that return as soon as a mismatch is found — leaking the position of the first difference.
 - **Variable-time cryptographic operations**: Calls to crypto APIs whose execution time depends on the input value (e.g., modular exponentiation, scalar multiplication with non-constant-time implementations, BigInteger operations).
@@ -37,9 +45,11 @@ An operation is a candidate if it processes secret/private data **and** contains
 - **Variable-length encoding of secrets**: Operations that encode/decode secrets in formats where the output length depends on the secret value (e.g., DER encoding of ECDSA signatures, ASN.1 encoding of keys).
 - **Conditional error handling on secret values**: Different exception types or error paths triggered by properties of the secret (e.g., "key is zero" vs "key is valid").
 - **Data-dependent memory operations**: `arrayCopy` or `arrayFill` calls where the length or offset depends on a secret value.
+- **Non-uniform access to the memory**: Reading from memory/arrays unevenly for different indexes
 
 #### What to include
 
+- **Custom security/cryptographic implementations**
 - **Cryptographic operations**: signing, hashing, encryption/decryption, key derivation, key agreement, MAC computation — these inherently process secrets and often use variable-time algorithms.
 - **Authentication handlers**: PIN verification, password checks, challenge-response protocols — these compare user input against stored secrets.
 - **Key management**: key import, key generation, key derivation — these handle raw key material that may be processed in variable time.
@@ -48,6 +58,7 @@ An operation is a candidate if it processes secret/private data **and** contains
 
 #### What to skip
 
+- Methods based only on standard Java Card API without custom security/cryptographic implementations
 - Operations that only read/write **non-secret** metadata (labels, version info, free memory counters).
 - Operations that return **public** information with no secret-dependent control flow.
 - Operations where all code paths are demonstrably constant-time (no branching/looping on secrets, use of `Util.arrayCompare` is still a candidate since the JC implementation may not be constant-time).
