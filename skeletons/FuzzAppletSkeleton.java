@@ -17,9 +17,6 @@
  *   P1/P2: unused at APDU level (per-input P1/P2 are inside each input set)
  *   CDATA: [size_A(2) | input_set_A(size_A) | input_set_B(remaining)]
  *     where input_set = [p1(1) | p2(1) | operation_data]
- *
- * Response format:
- *   [len_A(2) | result_A(len_A) | len_B(2) | result_B(len_B)]
  */
 
 package /* GENERATED: set package name */;
@@ -204,22 +201,6 @@ public class /* GENERATED: set class name */ extends javacard.framework.Applet {
                     fuzzBuffer, FUZZ_RESULT_B_OFFSET, lenB);
 
         Kelinci.addCost(Math.abs(costA - costB));
-
-        // ---- BUILD RESPONSE ----
-        // Response = [len_A(2) | result_A(len_A) | len_B(2) | result_B(len_B)]
-        short outOff = 0;
-        Util.setShort(buffer, outOff, lenA); outOff += 2;
-        if (lenA > 0) {
-            Util.arrayCopyNonAtomic(fuzzBuffer, FUZZ_RESULT_A_OFFSET, buffer, outOff, lenA);
-            outOff += lenA;
-        }
-        Util.setShort(buffer, outOff, lenB); outOff += 2;
-        if (lenB > 0) {
-            Util.arrayCopyNonAtomic(fuzzBuffer, FUZZ_RESULT_B_OFFSET, buffer, outOff, lenB);
-            outOff += lenB;
-        }
-
-        apdu.setOutgoingAndSend((short) 0, outOff);
     }
 
     /***************************************************************************
