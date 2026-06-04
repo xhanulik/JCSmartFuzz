@@ -164,9 +164,13 @@ Initial seed generation for fuzzing campaigns — in development.
 * Automatic generation of fuzzing driver
   * [x] Python script for 
 
+#### Verification of correct applet extraction
+* [ ] TBD
+
 ### Initial seed corpus generation
 * Generation script
   * [x] Basic prompt
+  * [ ] Combination of LLM and randomly generated seeds
 
 ### Fuzzing loop seed injection
 * Basic functionality:
@@ -196,3 +200,7 @@ Initial seed generation for fuzzing campaigns — in development.
   * [ ] Seed generation based on path exploration
   * [ ] Dictionary generation
   * [ ] Custom mutators via shared libraries
+
+### Fuzzing eveluation
+* [x] Basic script for printing out fuzzing stats
+* [ ] Human-readable and understandable report on fuzzing results
