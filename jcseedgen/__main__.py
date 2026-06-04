@@ -70,26 +70,62 @@ def list_models(api_token):
         print(m)
 
 
+def _detect_max_data(source_path, op_name):
+    """Try to read MAX_DATA for *op_name* from the wrapper in *source_path*.
+
+    Delegates to drivergen._find_max_data which looks for:
+      1. Javadoc ``* MAX_DATA = N``
+      2. Guard   ``if (dataLen < (short) N)``
+    Returns the integer value, or None if not found or drivergen is absent.
+    """
+    if not HAS_APPLET_PARSER:
+        return None
+    try:
+        from generate_drivers import _find_max_data  # private but stable
+        source = Path(source_path).read_text(encoding="utf-8")
+        return _find_max_data(source, f"wrap{op_name}")
+    except Exception:
+        return None
+
+
 def run_for_operation(source_path, op_name, max_data, out_dir, args):
-    """Run LLM generation (and optionally deterministic seeds) for one operation."""
+    """Run LLM generation (and optionally deterministic seeds) for one operation.
+
+    When args.no_llm is True the LLM call is skipped entirely; source_path may
+    be None in that case.
+    """
+    # Auto-detect MAX_DATA from the source if it was not supplied explicitly.
+    if max_data is None and source_path is not None and op_name is not None:
+        max_data = _detect_max_data(source_path, op_name)
+        if max_data is not None:
+            log.info("Auto-detected MAX_DATA=%d for %s from source", max_data, op_name)
+        else:
+            log.warning(
+                "MAX_DATA not found for %s in %s — "
+                "seed size will be symbolic in the prompt and deterministic "
+                "seeds will be skipped. Add a '* MAX_DATA = N' Javadoc line "
+                "or 'if (dataLen < (short) N)' guard to the wrapper.",
+                op_name, source_path)
+
     log.info("Operation: %s  MAX_DATA=%s  → %s", op_name, max_data, out_dir)
 
-    gen = LLMSeedGenerator(
-        source_code_path=str(source_path),
-        seed_output_dir=str(out_dir),
-        op_name=op_name,
-        max_data=max_data,
-        model=args.model,
-        print_prompt=args.print_prompt,
-        llm_timeout=args.timeout,
-    )
-    gen.run(count=args.count)
+    if not args.no_llm:
+        gen = LLMSeedGenerator(
+            source_code_path=str(source_path),
+            seed_output_dir=str(out_dir),
+            op_name=op_name,
+            max_data=max_data,
+            model=args.model,
+            print_prompt=args.print_prompt,
+            llm_timeout=args.timeout,
+        )
+        gen.run(count=args.count)
 
     if HAS_DETERMINISTIC and not args.no_deterministic and max_data is not None:
         det_seeds = generate_all(max_data, args.p1_max, args.p2_max,
                                  args.random_count)
         write_seeds(det_seeds, Path(out_dir))
-        log.info("Also wrote %d deterministic seeds to %s", len(det_seeds), out_dir)
+        log.info("Wrote %d deterministic seeds to %s", len(det_seeds), out_dir)
 
 
 def main():
@@ -109,6 +145,12 @@ def main():
         "--applet", metavar="PATH",
         help="Path to *FuzzApplet.java — auto-detect all operations and generate "
              "one sub-directory per operation (requires drivergen/)")
+
+    # LLM control
+    parser.add_argument(
+        "--no-llm", action="store_true",
+        help="Skip LLM generation entirely; write only deterministic seeds. "
+             "When used with --max-data a source file is not required.")
 
     parser.add_argument(
         "--op-name", metavar="NAME",
@@ -216,10 +258,27 @@ def main():
         return
 
     # ------------------------------------------------------------------
+    # --no-llm --max-data N  (no source file needed)
+    # ------------------------------------------------------------------
+    if args.no_llm and not args.source and not args.applet:
+        if args.max_data is None:
+            parser.error(
+                "--max-data is required when --no-llm is used without --source or --applet")
+        if not HAS_DETERMINISTIC:
+            print("ERROR: generate_seeds.py not found.", file=sys.stderr)
+            sys.exit(1)
+        seeds = generate_all(args.max_data, args.p1_max, args.p2_max,
+                             args.random_count)
+        print(f"MAX_DATA={args.max_data}  seed size={6 + 2 * args.max_data} bytes")
+        write_seeds(seeds, out_root)
+        return
+
+    # ------------------------------------------------------------------
     # Single-source mode
     # ------------------------------------------------------------------
     if not args.source:
-        parser.error("one of --source or --applet is required")
+        parser.error("one of --source or --applet is required "
+                     "(or use --no-llm --max-data N)")
 
     source_path = Path(args.source)
     if not source_path.is_file():

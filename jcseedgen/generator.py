@@ -49,8 +49,6 @@ except ImportError:
 
 log = logging.getLogger(__name__)
 
-# e-INFRA CZ AI-as-a-Service (OpenAI-compatible) chat completions endpoint.
-# See https://docs.cerit.io/en/docs/ai-as-a-service/ai-api
 E_INFRA_ENDPOINT = "https://llm.ai.e-infra.cz/v1/chat/completions"
 E_INFRA_DEFAULT_MODEL = "gpt-oss-120b"
 E_INFRA_TIMEOUT_SECONDS = 120
@@ -105,7 +103,6 @@ class LLMSeedGenerator:
         self.max_data = max_data
         self.source_reader = SourceReader(source_code_path)
         self.seed_output_dir = seed_output_dir
-        self.seed_counter = 0
         self.model = model
         self.api_token = api_token or os.environ.get("LLM_API_TOKEN")
         self.print_prompt = print_prompt
@@ -114,7 +111,10 @@ class LLMSeedGenerator:
 
         # Deduplication: hashes of seeds already in the output directory so
         # restarts and multiple cycles don't re-write the same content.
+        # Also find the highest existing llm_seed_NNNNNN id so the counter
+        # starts above it and never overwrites an existing file.
         self._seen_hashes: set = set()
+        max_existing_id = -1
         for fname in os.listdir(seed_output_dir):
             fpath = os.path.join(seed_output_dir, fname)
             if os.path.isfile(fpath):
@@ -123,6 +123,13 @@ class LLMSeedGenerator:
                         self._seen_hashes.add(hashlib.sha256(f.read()).digest())
                 except OSError:
                     pass
+                if fname.startswith("llm_seed_"):
+                    try:
+                        max_existing_id = max(max_existing_id,
+                                              int(fname[len("llm_seed_"):]))
+                    except ValueError:
+                        pass
+        self.seed_counter = max_existing_id + 1
 
     # ==================================================================
     # Has a working default via SourceReader — override to customise.
