@@ -5,25 +5,25 @@ A side-car process that augments an AFL++ fuzzing campaign with seeds produced b
 
 ## Data Flow
 
-            ┌─────────────────────────────┐
-            │       AFL++  (-M main)      │
-            │   out/main/{queue,stats}    │
-            └──────────┬──────────────────┘
-                       │ reads
-                       ▼
-          ┌──────────────────────────┐        ┌────────────────┐
-          │   LLMSeedGenerator       │──────▶│   LLM API      │
-          │   (run_loop every N s)   │◀──────│ (llm.ai.e-infra)│
-          └──────────┬───────────────┘        └────────────────┘
-                     │ writes seed files
-                     ▼
-          ┌──────────────────────────┐
-          │   --seed-dir  ( -F )     │
-          └──────────┬───────────────┘
-                     │ foreign-synced
-                     ▼
-            AFL++ imports new files
-            into out/main/queue/...
+┌─────────────────────────────┐
+│       AFL++  (-M main)      │
+│   out/main/{queue,stats}    │
+└──────────┬──────────────────┘
+            │ reads
+            ▼
+┌──────────────────────────┐        ┌────────────────┐
+│   LLMSeedGenerator       │──────▶│   LLM API      │
+│   (run_loop every N s)   │◀──────│ (llm.ai.e-infra)│
+└──────────┬───────────────┘        └────────────────┘
+            │ writes seed files
+            ▼
+┌──────────────────────────┐
+│   --seed-dir  ( -F )     │
+└──────────┬───────────────┘
+            │ foreign-synced
+            ▼
+AFL++ imports new files
+into out/main/queue/...
 
 Inputs the generator needs:
 
