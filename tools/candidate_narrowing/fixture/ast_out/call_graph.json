@@ -1,0 +1,18 @@
+{
+  "direct": {
+    "PinApplet.applyDiscount": [
+      "PinApplet.denyAccess",
+      "PinApplet.grantAccess"
+    ]
+  },
+  "transitive": {
+    "PinApplet.applyDiscount": [
+      "PinApplet.denyAccess",
+      "PinApplet.grantAccess"
+    ]
+  },
+  "recursive_methods": [],
+  "transitive_private_helpers": {
+    "PinApplet.applyDiscount": []
+  }
+}

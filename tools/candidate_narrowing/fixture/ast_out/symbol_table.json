@@ -1,0 +1,91 @@
+{
+  "PinApplet": {
+    "package": "fixture",
+    "kind": "class",
+    "extends": null,
+    "implements": [],
+    "fields": {
+      "storedPin": "byte[]",
+      "triesLeft": "byte"
+    },
+    "methods": {
+      "checkPin": [
+        {
+          "return_type": "boolean",
+          "params": [
+            [
+              "pin",
+              "byte[]"
+            ]
+          ],
+          "modifiers": []
+        }
+      ],
+      "checkPinRenamed": [
+        {
+          "return_type": "boolean",
+          "params": [
+            [
+              "pin",
+              "byte[]"
+            ]
+          ],
+          "modifiers": []
+        }
+      ],
+      "applyDiscount": [
+        {
+          "return_type": "void",
+          "params": [
+            [
+              "secretCode",
+              "byte[]"
+            ]
+          ],
+          "modifiers": []
+        }
+      ],
+      "mix": [
+        {
+          "return_type": "void",
+          "params": [
+            [
+              "out",
+              "byte[]"
+            ],
+            [
+              "a",
+              "byte[]"
+            ],
+            [
+              "b",
+              "byte[]"
+            ]
+          ],
+          "modifiers": []
+        }
+      ],
+      "reset": [
+        {
+          "return_type": "void",
+          "params": [],
+          "modifiers": []
+        }
+      ],
+      "grantAccess": [
+        {
+          "return_type": "void",
+          "params": [],
+          "modifiers": []
+        }
+      ],
+      "denyAccess": [
+        {
+          "return_type": "void",
+          "params": [],
+          "modifiers": []
+        }
+      ]
+    }
+  }
+}
