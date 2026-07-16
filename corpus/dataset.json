@@ -1,0 +1,1465 @@
+[
+  {
+    "name": "Belgian-e-id applet",
+    "link": "https://github.com/amoerie/belgian-e-id",
+    "category": "Electronic passports and citizen ID",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "Electronic Driving License",
+    "link": "https://github.com/martinpaljak/AppletPlayground/tree/master/src/org/isodl/applet",
+    "category": "Electronic passports and citizen ID",
+    "last_commit": "last commit noted as 2015",
+    "date_of_last_commit": "2015"
+  },
+  {
+    "name": "EstEID compatible JavaCard applets",
+    "link": "https://github.com/martinpaljak/esteid-applets",
+    "category": "Electronic passports and citizen ID",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "FedICT Quick-Key Toolset",
+    "link": "https://github.com/Twuk/eid-quick-key-toolset/tree/master/eid-quick-key-toolset",
+    "category": "Electronic passports and citizen ID",
+    "last_commit": "last commit noted as 2011",
+    "date_of_last_commit": "2011"
+  },
+  {
+    "name": "IdentityCard applet",
+    "link": "https://github.com/JavaCardSpot-dev/IdentityCard-applet/tree/master/workspace/JavaCard",
+    "category": "Electronic passports and citizen ID",
+    "last_commit": "last commit noted as 2017",
+    "date_of_last_commit": "2017"
+  },
+  {
+    "name": "InfinitEID",
+    "link": "https://github.com/Muzosh/InfinitEID",
+    "category": "Electronic passports and citizen ID",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "JMRTD applet without EAC support",
+    "link": "https://github.com/walterschell/jmrtd-noeac",
+    "category": "Electronic passports and citizen ID",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "SIC eID card",
+    "link": "https://github.com/nversbra/SIC",
+    "category": "Electronic passports and citizen ID",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "Swedish public transport card applet",
+    "link": "https://github.com/kirei/mts7-javacard",
+    "category": "Electronic passports and citizen ID",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "apex-totp",
+    "link": "https://github.com/VivoKey/apex-totp",
+    "category": "Authentication and access control",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "Biometric Authentication",
+    "link": "https://github.com/albertocarp/BiometricAuthentification",
+    "category": "Authentication and access control",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "CoolKey Applet",
+    "link": "https://github.com/NabilNoaman/CoolkeyApplet",
+    "category": "Authentication and access control",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "FIDO2 Applet",
+    "link": "https://github.com/BryanJacobs/FIDO2Applet/",
+    "category": "Authentication and access control",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "FIDO CCU2F Applet",
+    "link": "https://github.com/tsenger/CCU2F",
+    "category": "Authentication and access control",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "FIDO de.fac2 Applet",
+    "link": "https://github.com/tsenger/de.fac2",
+    "category": "Authentication and access control",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "Generic Identity Device Specification Applet",
+    "link": "https://github.com/vletoux/GidsApplet",
+    "category": "Authentication and access control",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "Generic Identity Device Applet (JavaCardOS)",
+    "link": "https://github.com/JavaCardOS/GidsApp",
+    "category": "Authentication and access control",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "HOTP authenticator via NDEF tag",
+    "link": "https://github.com/petrs/hotp_via_ndef",
+    "category": "Authentication and access control",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "ISOApplet PKI",
+    "link": "https://github.com/philipWendland/IsoApplet",
+    "category": "Authentication and access control",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "Android Identity Credential HAL JCICStoreApplet",
+    "link": "https://github.com/mdwivedi/JavacardIdentity",
+    "category": "Authentication and access control",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "Ledger U2F Applet",
+    "link": "https://github.com/LedgerHQ/ledger-u2f-javacard",
+    "category": "Authentication and access control",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "Ledger U2F Applet Fork",
+    "link": "https://github.com/darconeous/u2f-javacard/",
+    "category": "Authentication and access control",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "MuscleApplet",
+    "link": "https://github.com/martinpaljak/MuscleApplet",
+    "category": "Authentication and access control",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "OneCard",
+    "link": "https://github.com/ash2005/OneCard",
+    "category": "Authentication and access control",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "OpenFIPS201 PIV applet",
+    "link": "https://github.com/makinako/OpenFIPS201",
+    "category": "Authentication and access control",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "ORWL KeyFob applets",
+    "link": "https://github.com/O-R-W-L/KeyFob-applet",
+    "category": "Authentication and access control",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "OTP client and server applets",
+    "link": "https://github.com/gelvaos/otp",
+    "category": "Authentication and access control",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "PinSentry-OTP for Barclays PinSentry device",
+    "link": "https://github.com/Celliwig/PinSentry-OTP",
+    "category": "Authentication and access control",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "PIV applet",
+    "link": "https://github.com/arekinath/PivApplet",
+    "category": "Authentication and access control",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "PIV CryptonitApplet",
+    "link": "https://github.com/mbrossard/cryptonit-applet",
+    "category": "Authentication and access control",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "PKCS#15 applet",
+    "link": "https://archive.softwareheritage.org/browse/origin/directory/?origin_url=https://github.com/lupascualex/p15",
+    "category": "Authentication and access control",
+    "last_commit": "last commit noted as 2015",
+    "date_of_last_commit": "2015"
+  },
+  {
+    "name": "SMPC RSA (Smart-ID)",
+    "link": "https://github.com/lzaoral/javacard-smpc-rsa",
+    "category": "Authentication and access control",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "SSH support applet",
+    "link": "https://github.com/scs/uclinux/blob/eb0cf9617bd22b69ad625575a95cf4fa2c140d55/user/ssh/scard/Ssh.java",
+    "category": "Authentication and access control",
+    "last_commit": "last commit noted as 2007",
+    "date_of_last_commit": "2007"
+  },
+  {
+    "name": "SIMple ID",
+    "link": "https://github.com/alan-turing-institute/simple-id",
+    "category": "Authentication and access control",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "Trusted Identity Module",
+    "link": "https://github.com/Orange-OpenSource/TIM",
+    "category": "Authentication and access control",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "U2FToken",
+    "link": "https://github.com/fightyz/U2FToken",
+    "category": "Authentication and access control",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "YkOtpApplet - OTP applet",
+    "link": "https://github.com/arekinath/YkOtpApplet",
+    "category": "Authentication and access control",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "YkOtpApplet - VivoKey fork",
+    "link": "https://github.com/DangerousThings/flexsecure-ykhmac",
+    "category": "Authentication and access control",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "YubiKey NEO App: OATH",
+    "link": "https://github.com/Yubico/ykneo-oath",
+    "category": "Authentication and access control",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "Yubikey Neo One Time Pad",
+    "link": "https://github.com/cayennegraphics/Yubisec",
+    "category": "Authentication and access control",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "AppSecure",
+    "link": "https://github.com/deepakprabhakara/appsecure",
+    "category": "Payments and loyalty",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "E-Purse",
+    "link": "https://github.com/tomirio619/hw-epurse",
+    "category": "Payments and loyalty",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "EMV card simulator",
+    "link": "https://github.com/mrautio/emv-card-simulator",
+    "category": "Payments and loyalty",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "EMV-TOOLS",
+    "link": "https://github.com/gabessolo/EMV-TOOLS",
+    "category": "Payments and loyalty",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "EMVCAP",
+    "link": "https://github.com/zoobab/EMVCAP",
+    "category": "Payments and loyalty",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "Gemplus Purse applet",
+    "link": "https://github.com/ncatanoc/chasetool",
+    "category": "Payments and loyalty",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "JavaCard Wallet",
+    "link": "https://github.com/RimGazzeh/JavaCard_Wallet",
+    "category": "Payments and loyalty",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "Loyalty Card Applet",
+    "link": "https://github.com/Anthirian/Loyalty-Card",
+    "category": "Payments and loyalty",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "Mobile banking applet via STK",
+    "link": "https://github.com/ubs121/mbank_STK",
+    "category": "Payments and loyalty",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "OpenEMV",
+    "link": "https://github.com/JavaCardOS/OpenEMV",
+    "category": "Payments and loyalty",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "EMV Applet for Javacard 2.2.1",
+    "link": "https://github.com/tiosolid/emv_applet",
+    "category": "Payments and loyalty",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "PayPass applet",
+    "link": "https://github.com/jiankeliu5/CardApplet-PayPass",
+    "category": "Payments and loyalty",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "PayPass, VisaMSD, MMPP applets",
+    "link": "https://github.com/javacard-FOSS-applets/CardExamples",
+    "category": "Payments and loyalty",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "PBOC3Applet",
+    "link": "https://github.com/jiankeliu5/PBOC3Applet",
+    "category": "Payments and loyalty",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "PBOC3_JC2_1_1_ICFC_SIO",
+    "link": "https://github.com/Ever-Never/PBOC",
+    "category": "Payments and loyalty",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "Simple Wallet",
+    "link": "https://github.com/fitpay/javacard-simple-wallet",
+    "category": "Payments and loyalty",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "CryptSetup JavaCard Key Manager",
+    "link": "https://github.com/WOnder93/cryptsetup-javacard",
+    "category": "Key and password managers",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "HydraMultiKeySystem applet",
+    "link": "https://github.com/thotheolh/HydraMultiKeySystem",
+    "category": "Key and password managers",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "Java Card OpenPGP Card",
+    "link": "https://github.com/jderuiter/javacard-openpgpcard",
+    "category": "Key and password managers",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "JavaCardKeymaster",
+    "link": "https://github.com/divegeek/JavaCardKeymaster",
+    "category": "Key and password managers",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "JCPasswordManager",
+    "link": "https://github.com/bayotop/JCPasswordManager",
+    "category": "Key and password managers",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "KeepassNFCApplet",
+    "link": "https://github.com/JavaCardOS/KeepassNFCApplet",
+    "category": "Key and password managers",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "OMNI Key-Ring",
+    "link": "https://github.com/G1gg1L3s/key-ring",
+    "category": "Key and password managers",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "Password manager",
+    "link": "https://github.com/cranixx/Passmg",
+    "category": "Key and password managers",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "SIM Password Manager",
+    "link": "https://github.com/nelenkov/sim-password-manager",
+    "category": "Key and password managers",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "SIM password store",
+    "link": "https://github.com/gtomek/sim-password-store",
+    "category": "Key and password managers",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "SIM password wallet",
+    "link": "https://github.com/bertrandmartel/sim-password-wallet",
+    "category": "Key and password managers",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "Smartcard crypto applet",
+    "link": "https://github.com/nfd/smartcard_crypto_applet",
+    "category": "Key and password managers",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "TrueCrypt password storage applet",
+    "link": "https://github.com/Mercixor/smartcard-truecrypt",
+    "category": "Key and password managers",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "ANSSI-FR SmartPGP applet",
+    "link": "https://github.com/ANSSI-FR/SmartPGP",
+    "category": "Digital signing, OpenPGP and mail security",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "FluffyPGP applet",
+    "link": "https://github.com/JavaCardOS/FluffyPGP-Applet",
+    "category": "Digital signing, OpenPGP and mail security",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "NeoPGP applet",
+    "link": "https://github.com/mwalle/neopgp",
+    "category": "Digital signing, OpenPGP and mail security",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "Secure multi-party signatures Myst",
+    "link": "https://github.com/OpenCryptoProject/Myst",
+    "category": "Digital signing, OpenPGP and mail security",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "SigAnima",
+    "link": "https://github.com/tsenger/SigAnima",
+    "category": "Digital signing, OpenPGP and mail security",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "Virtual KeyCard applet",
+    "link": "https://github.com/eriknellessen/Virtual-Keycard",
+    "category": "Digital signing, OpenPGP and mail security",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "Yubico OpenPGP applet",
+    "link": "https://github.com/Yubico/ykneo-openpgp",
+    "category": "Digital signing, OpenPGP and mail security",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "EGKfeuer",
+    "link": "https://github.com/elnin0815/EGKfeuer",
+    "category": "e-Health",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "Electronic health card",
+    "link": "https://github.com/gabriellewp/eHealthCard",
+    "category": "e-Health",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "Cool NDEF Thing",
+    "link": "https://github.com/non-bin/coolNDEFthing",
+    "category": "NDEF tags",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "JavaCard NDEF Applet",
+    "link": "https://github.com/OpenJavaCard/openjavacard-ndef",
+    "category": "NDEF tags",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "JavaCard NDEF application",
+    "link": "https://github.com/slomo/ndef-javacard",
+    "category": "NDEF tags",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "Pico NDEF Applet",
+    "link": "https://github.com/MpicoSys/PicoLabel/tree/master/java/scc_applet/Pico_NDEF/src/org/aispring/javacard/ndef",
+    "category": "NDEF tags",
+    "last_commit": "last commit noted as 2017",
+    "date_of_last_commit": "2017"
+  },
+  {
+    "name": "Bitcoin wallet",
+    "link": "https://github.com/JavaCardOS/BitcoinWallet",
+    "category": "CryptoCurrency wallets",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "BitaWalletCard",
+    "link": "https://github.com/hosseinpro/BitaWalletCard",
+    "category": "CryptoCurrency wallets",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "CoolWallet Pro applet",
+    "link": "https://github.com/CoolBitX-Technology/coolwallet-pro-se",
+    "category": "CryptoCurrency wallets",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "Ledger Bitcoin Hardware Wallet ",
+    "link": "https://github.com/LedgerHQ/ledger-javacard",
+    "category": "CryptoCurrency wallets",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "Ledger Wallet Java Card Eligibility applet",
+    "link": "https://github.com/LedgerHQ/ledger-javacard-eligibility",
+    "category": "CryptoCurrency wallets",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "Lamassu card",
+    "link": "https://github.com/zu-ctrl/ssu-card/",
+    "category": "CryptoCurrency wallets",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "Monoid applet",
+    "link": "https://github.com/vilicvane/monoid-javacard",
+    "category": "CryptoCurrency wallets",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "SatoChip Bitcoin applet",
+    "link": "https://github.com/Toporin/SatoChipApplet",
+    "category": "CryptoCurrency wallets",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "SatoChip Seedkeeper-Applet",
+    "link": "https://github.com/Toporin/Seedkeeper-Applet",
+    "category": "CryptoCurrency wallets",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "SlimDuet wallet applet",
+    "link": "https://github.com/TaisysTeam/slimduet_wallet_applet",
+    "category": "CryptoCurrency wallets",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "SecureBitcoinWalletJavaCardApplet",
+    "link": "https://github.com/acidg/SecureBitcoinWalletJavaCardApplet",
+    "category": "CryptoCurrency wallets",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "Specter-DIY Bitcoin wallet applets",
+    "link": "https://github.com/cryptoadvance/specter-javacard",
+    "category": "CryptoCurrency wallets",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "Status KeyCard",
+    "link": "https://github.com/status-im/status-keycard",
+    "category": "CryptoCurrency wallets",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "DESFire applet",
+    "link": "https://github.com/robsbeat1/Java-Card-Project",
+    "category": "Emulation of some proprietary cards",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "Gauss Key Card",
+    "link": "https://github.com/darconeous/gauss-key-card",
+    "category": "Emulation of some proprietary cards",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "IllegalSecurityChip",
+    "link": "https://github.com/dogtopus/IllegalSecurityChip",
+    "category": "Emulation of some proprietary cards",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "JavaCard DESFire emulation",
+    "link": "https://github.com/SakaZulu/java-card-desfire-emulation",
+    "category": "Emulation of some proprietary cards",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "MobileEDEPV3",
+    "link": "https://github.com/FourTree/EDEPApplet-hengbao/tree/master/MobileEDEPV3",
+    "category": "Emulation of some proprietary cards",
+    "last_commit": "last commit noted as 2016",
+    "date_of_last_commit": "2016"
+  },
+  {
+    "name": "TAG 4 emulation",
+    "link": "https://github.com/Tordensky/Tag4",
+    "category": "Emulation of some proprietary cards",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "LiteID-SimApp",
+    "link": "https://github.com/LiteID/LiteID-SimApp",
+    "category": "Mobile telephony (SIM)",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "sim-applet-sms-im-alive",
+    "link": "https://github.com/PodgroupConnectivity/sim-applet-sms-im-alive",
+    "category": "Mobile telephony (SIM)",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "sim-applet-apn-autoconf",
+    "link": "https://github.com/PodgroupConnectivity/sim-applet-apn-autoconf",
+    "category": "Mobile telephony (SIM)",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "sim-applet-data-heartbeat",
+    "link": "https://github.com/PodgroupConnectivity/sim-applet-data-heartbeat",
+    "category": "Mobile telephony (SIM)",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "STKApplet",
+    "link": "https://github.com/javacard-FOSS-applets/z-first-applet",
+    "category": "Mobile telephony (SIM)",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "UPSC framework",
+    "link": "https://github.com/paromix/upsc",
+    "category": "Mobile telephony (SIM)",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "E-Voting applet",
+    "link": "https://github.com/EVIVoting/EVIV",
+    "category": "Unsorted applications",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "javacard-petrol-rationing",
+    "link": "https://archive.softwareheritage.org/browse/origin/directory/?origin_url=https://github.com/alegen/javacard-petrol-rationing",
+    "category": "Unsorted applications",
+    "last_commit": "last commit noted as 2014",
+    "date_of_last_commit": "2014"
+  },
+  {
+    "name": "LicenseCardApp",
+    "link": "https://github.com/FourTree/LicenseCardApp",
+    "category": "Unsorted applications",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "MQTT-SCACAuth: Message Queuing Telemetry Transport (MQTT) protocol for SC",
+    "link": "https://github.com/EBuetas78/MQTT-SCACAuth",
+    "category": "Unsorted applications",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "Prototype firmware for the Trusted Execution Module (TEM)",
+    "link": "https://github.com/csail/tem_fw",
+    "category": "Unsorted applications",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "Secure-Storage-and-Erasure",
+    "link": "https://github.com/SecurityResearcher/SSE",
+    "category": "Unsorted applications",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "SmartMeterIQ",
+    "link": "https://github.com/adityasawhney/SmartMeterIQ",
+    "category": "Unsorted applications",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "smartleia-target-applet",
+    "link": "https://github.com/cw-leia/smartleia-target-applet",
+    "category": "Unsorted applications",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "T101-Devhub",
+    "link": "https://github.com/ThothTrustCom/T101-Devhub",
+    "category": "Unsorted applications",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "TPM2 applet",
+    "link": "https://github.com/mobilesec/tpm2-se-applet",
+    "category": "Unsorted applications",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "Wookey Javacard applets",
+    "link": "https://github.com/wookey-project/javacard-applet",
+    "category": "Unsorted applications",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "ACORN, AEGIS, ASCON, CLOC, and MORUS AEAD ciphers",
+    "link": "https://github.com/palkrajesh/AEonJC",
+    "category": "Library code (code which is expected to be used as part of other code)",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "AES, OAEP, SHA2-384 and SHA2-512 JC reimplementation,",
+    "link": "https://github.com/petrs/JCSWAlgs",
+    "category": "Library code (code which is expected to be used as part of other code)",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "Audit TTP SmartCard-Based ElGamal Cryptosystem",
+    "link": "https://github.com/AuditURV/Audit",
+    "category": "Library code (code which is expected to be used as part of other code)",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "Curve25519 jc implementation",
+    "link": "https://github.com/david-oswald/jc_curve25519",
+    "category": "Library code (code which is expected to be used as part of other code)",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "EC-SRP-5 password-authenticated secure channel",
+    "link": "https://github.com/mobilesec/secure-channel-ec-srp-applet",
+    "category": "Library code (code which is expected to be used as part of other code)",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "ElGamal-based Threshold Scheme for Electronic Elections",
+    "link": "https://github.com/CRISES-URV/eVerification-2",
+    "category": "Library code (code which is expected to be used as part of other code)",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "Export files for ETSI/3GPP APIs",
+    "link": "https://github.com/OpenJavaCard/etsi-exports",
+    "category": "Library code (code which is expected to be used as part of other code)",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "GlobalPlatform SCP11B Secure Channel protocol ",
+    "link": "https://github.com/ThothTrustCom/SCP11B",
+    "category": "Library code (code which is expected to be used as part of other code)",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "Hashchain applet",
+    "link": "https://github.com/raminarmanfar/Java-smart-card-cryptographic-protocols",
+    "category": "Library code (code which is expected to be used as part of other code)",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "HMAC and CMAC computation",
+    "link": "https://github.com/mll11/jcard/tree/master/TestMAC",
+    "category": "Library code (code which is expected to be used as part of other code)",
+    "last_commit": "last commit noted as 2014",
+    "date_of_last_commit": "2014"
+  },
+  {
+    "name": "Java Card Synchronization Framework",
+    "link": "https://github.com/jfhren/jc_sync",
+    "category": "Library code (code which is expected to be used as part of other code)",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "JavaCard ChaCha20 implementation",
+    "link": "https://github.com/thotheolh/jcChaCha2032",
+    "category": "Library code (code which is expected to be used as part of other code)",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "JavaCard Connect",
+    "link": "https://github.com/nightcode/jcconnect",
+    "category": "Library code (code which is expected to be used as part of other code)",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "JCEd25519",
+    "link": "https://github.com/dufkan/JCEd25519",
+    "category": "Library code (code which is expected to be used as part of other code)",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "JCMathLib - ECPoint library",
+    "link": "https://github.com/OpenCryptoProject/JCMathLib",
+    "category": "Library code (code which is expected to be used as part of other code)",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "JC-SSRK: Sharded Secret Key Reconstruction (SSKR)",
+    "link": "https://github.com/proxyco/jc-sskr",
+    "category": "Library code (code which is expected to be used as part of other code)",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "JavaCardLightweightCiphers",
+    "link": "https://github.com/CarpAlberto/JavaCardLightweightCiphers",
+    "category": "Library code (code which is expected to be used as part of other code)",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "LibESE Android verified boot",
+    "link": "https://github.com/TinkerBoard2-Android/external-libese",
+    "category": "Library code (code which is expected to be used as part of other code)",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "OPACITY auth protocol for JC",
+    "link": "https://github.com/shevelevsergey/opacity-for-smartcard",
+    "category": "Library code (code which is expected to be used as part of other code)",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "OpenTLSSec",
+    "link": "https://github.com/halemmerich/opentlssc",
+    "category": "Library code (code which is expected to be used as part of other code)",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "Primitives for JavaCard",
+    "link": "https://github.com/albertocarp/Primitives_SmartCard",
+    "category": "Library code (code which is expected to be used as part of other code)",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "Protocol for Lightweight Authentication of Identity (PLAID)",
+    "link": "https://github.com/martinpaljak/AppletPlayground/tree/master/src/plaid804",
+    "category": "Library code (code which is expected to be used as part of other code)",
+    "last_commit": "last commit noted as 2015",
+    "date_of_last_commit": "2015"
+  },
+  {
+    "name": "SCP10 secure channel and attack",
+    "link": "https://github.com/ddealmei/SCP10-attack",
+    "category": "Library code (code which is expected to be used as part of other code)",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "Sec2 cloud security project",
+    "link": "https://github.com/RUB-NDS/Sec2",
+    "category": "Library code (code which is expected to be used as part of other code)",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "Secure Element Evaluation Kit for the Android platform",
+    "link": "https://github.com/seek-for-android/pool",
+    "category": "Library code (code which is expected to be used as part of other code)",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "Self-Blindable credentials",
+    "link": "https://github.com/credentials/sbcred_javacard",
+    "category": "Library code (code which is expected to be used as part of other code)",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "SHA3, PBKDF2, TWINE, Zorro, ACORN, AEGIS, ASCON, CLOC, and MORUS AEAD ciphers implementation",
+    "link": "https://github.com/crocs-muni/OptimizedJCAlgs",
+    "category": "Library code (code which is expected to be used as part of other code)",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "SmartCardTLS",
+    "link": "https://github.com/gilb/smart_card_TLS",
+    "category": "Library code (code which is expected to be used as part of other code)",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "SRP-6a password-authenticated secure channel",
+    "link": "https://github.com/mobilesec/secure-channel-srp6a-applet",
+    "category": "Library code (code which is expected to be used as part of other code)",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "TelephonyManager Carrier Privilege granting",
+    "link": "https://github.com/sabtmoha/carrier_privilege",
+    "category": "Library code (code which is expected to be used as part of other code)",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "ykneo-curves",
+    "link": "https://github.com/Yubico/ykneo-curves",
+    "category": "Library code (code which is expected to be used as part of other code)",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "\"Allow all\" ARA-M",
+    "link": "https://github.com/seek-for-android/allow-all-ara",
+    "category": "Applet build, upload and management",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "Ant-JavaCard",
+    "link": "https://github.com/martinpaljak/ant-javacard",
+    "category": "Applet build, upload and management",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "capfile handling tool",
+    "link": "https://github.com/martinpaljak/capfile",
+    "category": "Applet build, upload and management",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "Card2Jar",
+    "link": "https://github.com/benjholla/Card2Jar",
+    "category": "Applet build, upload and management",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "GlobalPlatform export files",
+    "link": "https://github.com/OpenJavaCard/globalplatform-exports",
+    "category": "Applet build, upload and management",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "GlobalPlatform / GPShell",
+    "link": "https://github.com/kaoh/globalplatform",
+    "category": "Applet build, upload and management",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "GlobalPlatformPro tool",
+    "link": "https://github.com/martinpaljak/GlobalPlatformPro",
+    "category": "Applet build, upload and management",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "GlobalPlatform Open Mobile API (OMAPI) tests",
+    "link": "https://github.com/GlobalPlatform/OMAPI-applets",
+    "category": "Applet build, upload and management",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "JavaCard debugging toolkit",
+    "link": "https://github.com/omarbenhamid/jcdebug",
+    "category": "Applet build, upload and management",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "JCProfiler: JavaCard performance profiler",
+    "link": "https://github.com/OpenCryptoProject/JCProfiler",
+    "category": "Applet build, upload and management",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "JCProfilerNext: JavaCard performance profiler",
+    "link": "https://github.com/lzaoral/JCProfilerNext",
+    "category": "Applet build, upload and management",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "JCUnit - JavaCard unit testing",
+    "link": "https://github.com/christianhujer/jcunit/",
+    "category": "Applet build, upload and management",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "ProGuard Java Optimizer and Obfuscator",
+    "link": "https://github.com/Guardsquare/proguard",
+    "category": "Applet build, upload and management",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "Real ARA-M",
+    "link": "https://github.com/bertrandmartel/aram-applet",
+    "category": "Applet build, upload and management",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "Sun/Oracle JavaCard SDK binaries",
+    "link": "https://github.com/martinpaljak/oracle_javacard_sdks",
+    "category": "Applet build, upload and management",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "CardPeek",
+    "link": "https://github.com/L1L1/cardpeek",
+    "category": "Card capabilities testing (algorithms support, performance, security issues)",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "ECTester",
+    "link": "https://github.com/petrs/ECTester",
+    "category": "Card capabilities testing (algorithms support, performance, security issues)",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "HandlerTest",
+    "link": "https://github.com/LudovicRousseau/HandlerTest",
+    "category": "Card capabilities testing (algorithms support, performance, security issues)",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "jcAIDScan",
+    "link": "https://github.com/petrs/jcAIDScan",
+    "category": "Card capabilities testing (algorithms support, performance, security issues)",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "JCAlgTest",
+    "link": "https://github.com/crocs-muni/JCAlgTest",
+    "category": "Card capabilities testing (algorithms support, performance, security issues)",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "JCOSTestKit",
+    "link": "https://github.com/ThothTrustCom/JCOSTestKit",
+    "category": "Card capabilities testing (algorithms support, performance, security issues)",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "Ledger Wallet Java Card Eligibility applet",
+    "link": "https://github.com/LedgerHQ/ledger-javacard-eligibility",
+    "category": "Card capabilities testing (algorithms support, performance, security issues)",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "Memory profiling tool",
+    "link": "https://github.com/maxashwin/JavaCard/tree/master/Wkg_MemoryMeasurementScript",
+    "category": "Card capabilities testing (algorithms support, performance, security issues)",
+    "last_commit": "last commit noted as 2017",
+    "date_of_last_commit": "2017"
+  },
+  {
+    "name": "Mesure performance tool",
+    "link": "https://github.com/wangganggithub/Mesure",
+    "category": "Card capabilities testing (algorithms support, performance, security issues)",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "Performance Benchmark Applet for Javacard/smartcard",
+    "link": "https://github.com/dmdclab/smartcard-benchmark",
+    "category": "Card capabilities testing (algorithms support, performance, security issues)",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "PicoLabel AES/DES/RSA speed tester",
+    "link": "https://github.com/MpicoSys/PicoLabel",
+    "category": "Card capabilities testing (algorithms support, performance, security issues)",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "SPA-JavaCard-Applet",
+    "link": "https://github.com/crocs-muni/SPA-JavaCard-Applet",
+    "category": "Card capabilities testing (algorithms support, performance, security issues)",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "Three applets testing on-card defenses against maliciously modified applets",
+    "link": "https://github.com/maxashwin/JavaCard",
+    "category": "Card capabilities testing (algorithms support, performance, security issues)",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "CesTa project",
+    "link": "https://github.com/formanek/CesTa",
+    "category": "Formal verification and code transformation tools",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "Joana IFC analysis framework",
+    "link": "https://github.com/joana-team/joana",
+    "category": "Formal verification and code transformation tools",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "KeYmaera 3",
+    "link": "https://github.com/LS-Lab/KeYmaera-release",
+    "category": "Formal verification and code transformation tools",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "The KeY project",
+    "link": "https://github.com/cirosantilli/key-java-formal-verification-fork",
+    "category": "Formal verification and code transformation tools",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "VeriFast",
+    "link": "https://github.com/verifast/verifast",
+    "category": "Formal verification and code transformation tools",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "CAPRunner",
+    "link": "https://github.com/benallard/caprunner",
+    "category": "JavaCard simulators and emulators",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "Java Card Simulator via Node.js",
+    "link": "https://github.com//abdelhak-mes/javacard-api",
+    "category": "JavaCard simulators and emulators",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "Java Card API",
+    "link": "https://github.com/adamnoakes/javacard-simulator",
+    "category": "JavaCard simulators and emulators",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "JCardEngine",
+    "link": "https://github.com/martinpaljak/jcardengine",
+    "category": "JavaCard simulators and emulators",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "JCardMock",
+    "link": "https://github.com/christianhujer/jcardmock",
+    "category": "JavaCard simulators and emulators",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "JCardSim:",
+    "link": "https://github.com/licel/jcardsim",
+    "category": "JavaCard simulators and emulators",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "PythonCard - JavaCard under PyPi",
+    "link": "https://github.com/benallard/pythoncard",
+    "category": "JavaCard simulators and emulators",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "remote-card",
+    "link": "https://github.com/ph4r05/remote-card",
+    "category": "JavaCard simulators and emulators",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "Secure Element Emulator",
+    "link": "https://github.com/mobilesec/secure-element-emulator",
+    "category": "JavaCard simulators and emulators",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "vJCRE ",
+    "link": "https://github.com/martinpaljak/vJCRE",
+    "category": "JavaCard simulators and emulators",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "AppletPlayground",
+    "link": "https://github.com/martinpaljak/AppletPlayground",
+    "category": "Learning (various school projects, simple hello world applets, etc)",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "Client applet for CDAX Crypto",
+    "link": "https://github.com/marlonbaeten/cdax-crypto-cpp/tree/f3329fcdf348b6a3ddc95b993dbc97b806aea335/applet",
+    "category": "Learning (various school projects, simple hello world applets, etc)",
+    "last_commit": "last commit noted as 2014",
+    "date_of_last_commit": "2014"
+  },
+  {
+    "name": "CryptedBankCard",
+    "link": "https://github.com/Herve-M/UQAM-EMB7015",
+    "category": "Learning (various school projects, simple hello world applets, etc)",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "HelloSTK2",
+    "link": "https://github.com/mrlnc/HelloSTK2",
+    "category": "Learning (various school projects, simple hello world applets, etc)",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "Hotel Buddy",
+    "link": "https://github.com/prayzzz/smartcard",
+    "category": "Learning (various school projects, simple hello world applets, etc)",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "JavaCard Demo",
+    "link": "https://github.com/leowenyang/JCDemo",
+    "category": "Learning (various school projects, simple hello world applets, etc)",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "Learning applets repository",
+    "link": "https://github.com/gracebear/JavaCard",
+    "category": "Learning (various school projects, simple hello world applets, etc)",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "Maze solver on JavaCard",
+    "link": "https://github.com/henryhoo/javacard_maze",
+    "category": "Learning (various school projects, simple hello world applets, etc)",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "MultiCard",
+    "link": "https://github.com/Dragonexodus/MultiCard",
+    "category": "Learning (various school projects, simple hello world applets, etc)",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "SecureChat",
+    "link": "https://github.com/sharedbits/JavaChat",
+    "category": "Learning (various school projects, simple hello world applets, etc)",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "Simple AES encrypt/decrypt",
+    "link": "https://github.com/pauksk/nrf6310-pca10007",
+    "category": "Learning (various school projects, simple hello world applets, etc)",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "Simple calculator on JavaCard",
+    "link": "https://github.com/steff7/javacard-calculator",
+    "category": "Learning (various school projects, simple hello world applets, etc)",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "Smartcard-Offline-Lock",
+    "link": "https://github.com/GeorgesAlkhouri/Smartcard-Offline-Lock",
+    "category": "Learning (various school projects, simple hello world applets, etc)",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "TraninCard applet",
+    "link": "https://github.com/TBoonX/sc_traincard",
+    "category": "Learning (various school projects, simple hello world applets, etc)",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "Corba",
+    "link": "https://github.com/lbarbisan/corba",
+    "category": "(needs further inspection)",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "Teleport secret Bitcoin applet",
+    "link": "https://github.com/EyeOfPython/teleport_secret",
+    "category": "(needs further inspection)",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  },
+  {
+    "name": "unifei-smart-cards",
+    "link": "https://github.com/tiagorg/unifei-smart-cards",
+    "category": "(needs further inspection)",
+    "last_commit": "dynamic (see GitHub badge, not a static value in README)",
+    "date_of_last_commit": null
+  }
+]
