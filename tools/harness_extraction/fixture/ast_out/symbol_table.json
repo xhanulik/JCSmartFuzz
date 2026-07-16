@@ -1,0 +1,80 @@
+{
+  "FixtureApplet": {
+    "package": "fixture",
+    "kind": "class",
+    "extends": null,
+    "implements": [],
+    "fields": {
+      "MAX_PIN_LEN": "byte",
+      "SW_NOT_INITIALIZED": "short",
+      "referencePin": "byte[]",
+      "triesLeft": "byte",
+      "initialized": "boolean"
+    },
+    "methods": {
+      "verifyPin": [
+        {
+          "return_type": "boolean",
+          "params": [
+            [
+              "buffer",
+              "byte[]"
+            ],
+            [
+              "offset",
+              "short"
+            ],
+            [
+              "len",
+              "byte"
+            ]
+          ],
+          "modifiers": [
+            "public"
+          ]
+        }
+      ],
+      "<init>": [
+        {
+          "return_type": "void",
+          "params": [],
+          "modifiers": [
+            "public"
+          ]
+        }
+      ]
+    }
+  },
+  "PinHelper": {
+    "package": "fixture",
+    "kind": "class",
+    "extends": null,
+    "implements": [],
+    "fields": {},
+    "methods": {
+      "foldChecksum": [
+        {
+          "return_type": "byte",
+          "params": [
+            [
+              "data",
+              "byte[]"
+            ],
+            [
+              "offset",
+              "short"
+            ],
+            [
+              "len",
+              "short"
+            ]
+          ],
+          "modifiers": [
+            "public",
+            "static"
+          ]
+        }
+      ]
+    }
+  }
+}
