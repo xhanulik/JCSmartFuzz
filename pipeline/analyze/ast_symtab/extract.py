@@ -52,10 +52,15 @@ from javalang.ast import Node
 
 
 def find_java_files(root: Path):
+    """All .java files under root, sorted for deterministic output ordering."""
     return sorted(p for p in root.rglob("*.java") if p.is_file())
 
 
 def type_to_str(t):
+    """Normalize a javalang type node to a display string, appending one `[]`
+    per array dimension (`None` -> "void"). Every type recorded in the output
+    passes through here, so array-ness is preserved but generics/qualifiers are
+    reduced to the bare type name."""
     if t is None:
         return "void"
     name = getattr(t, "name", str(t))
@@ -84,6 +89,11 @@ def extract_snippet(source_lines, start_line):
 
 
 class ClassInfo:
+    """One type declaration's symbol-table entry: its identity plus the
+    `name -> type` field map and the `name -> [overload signatures]` method map
+    that the resolvers (pass 2) look names up in. Constructors are stored in
+    `methods` under the key `<init>`."""
+
     def __init__(self, name, package, kind, extends, implements):
         self.name = name
         self.package = package
@@ -203,6 +213,10 @@ def collect_inherited_fields(class_name, classes):
 
 
 def collect_shadowing_names(method_node):
+    """Parameter and local-variable names in this method. Any field sharing one
+    of these names is dropped from the field def-use analysis for the whole
+    method (the blunt, block-scope-free shadowing rule from the module
+    docstring)."""
     names = {p.name for p in method_node.parameters}
     for _, lv in method_node.filter(javalang.tree.LocalVariableDeclaration):
         for decl in lv.declarators:
@@ -222,6 +236,12 @@ def analyze_field_dataflow(method_node, class_name, classes):
     order = []  # list of (field_name, 'read'|'write') in encounter order
 
     def visit_member_target(node, is_write_target):
+        """Record read/write event(s) for a MemberReference IF it names an own
+        instance field accessed bare or via `this`. `is_write_target` is
+        "plain" (`x = ...` -> write), "compound" (`x += ...` -> read then
+        write), or False (a use -> read). A member with selectors (`x[i]`,
+        `x.y`) is a read of `x` -- the reference is dereferenced, not
+        reassigned. Selectors are recursed into afterward."""
         qualifier = getattr(node, "qualifier", None)
         member = getattr(node, "member", None)
         selectors = getattr(node, "selectors", None) or []
@@ -245,6 +265,10 @@ def analyze_field_dataflow(method_node, class_name, classes):
             visit(sel)
 
     def visit(node):
+        """Lexical DFS over the AST, appending field access events to `order`
+        in source order. Assignments are special-cased so the RHS is visited
+        before the write is recorded (a read on the RHS orders ahead of the
+        write); every other node is walked generically via its `attrs`."""
         if node is None:
             return
         if isinstance(node, (list, tuple)):
@@ -296,6 +320,13 @@ def analyze_field_dataflow(method_node, class_name, classes):
 
 
 def _extract_one(m, method_name, class_name, imports, classes, lines, path):
+    """Build one method/constructor record (pass 2). Collects params and
+    locals, resolves each MethodInvocation's owning class via the qualifier
+    ladder (bare/`this` -> own+super chain; imported name -> its FQN; known
+    class -> itself; else a field/param/local's declared type), tagging calls
+    that don't land on an in-repo class as `external`. Then attaches the field
+    def-use analysis and the brace-matched source snippet. The transitive
+    call-graph fields are added later, in main(), once every record exists."""
     params = [{"name": p.name, "type": type_to_str(p.type)} for p in m.parameters]
     locals_ = []
     for _, lv in m.filter(javalang.tree.LocalVariableDeclaration):
@@ -354,6 +385,9 @@ def _extract_one(m, method_name, class_name, imports, classes, lines, path):
 
 
 def extract_methods(classes, file_imports, parsed):
+    """Pass 2 driver: walk every cached parse tree and emit one record per
+    method and per constructor across all types, using the pass-1 `classes`
+    symbol table for call/field resolution."""
     records = []
     for path, (tree, text, lines) in parsed.items():
         imports = file_imports.get(path, {})
@@ -370,10 +404,13 @@ def extract_methods(classes, file_imports, parsed):
 
 
 def method_key(class_name, method_name):
+    """Canonical call-graph node id `Class.method` (overloads share one node)."""
     return f"{class_name}.{method_name}"
 
 
 def is_private_method(class_name, method_name, classes):
+    """True if ANY overload of this name in the class is declared `private`
+    (overloads collapse to one node, so this is a name-level check)."""
     info = classes.get(class_name)
     if not info:
         return False
@@ -382,6 +419,11 @@ def is_private_method(class_name, method_name, classes):
 
 
 def build_call_graphs(records, classes):
+    """From the per-method `calls`, build three views over `Class.method`
+    nodes: `direct` (immediate internal edges, external calls dropped),
+    `transitive` (full reachable closure per caller, plus a self-reach
+    `recursive` flag), and `transitive_private` (the closure filtered to
+    private callees). Returns (direct_json, transitive, transitive_private)."""
     direct = {}
     for rec in records:
         caller = method_key(rec["class"], rec["method"])
@@ -390,6 +432,9 @@ def build_call_graphs(records, classes):
                 direct.setdefault(caller, set()).add(method_key(c["resolved_owner"], c["method"]))
 
     def closure(start):
+        """Iterative DFS over `direct` from `start`; returns (sorted reachable
+        nodes excluding `start`, recursive?) where recursive is True if `start`
+        is reachable from itself."""
         visited = set()
         stack = list(direct.get(start, ()))
         recursive = False
@@ -419,6 +464,10 @@ def build_call_graphs(records, classes):
 
 
 def main():
+    """End-to-end flow: discover .java files -> pass 1 build_symbol_table ->
+    write symbol_table.json -> pass 2 extract_methods -> build_call_graphs and
+    fold transitive_calls/recursive/transitive_private_helpers back into each
+    record -> write methods.jsonl and call_graph.json."""
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("src_dir", type=Path, help="path to the applet source directory")
     ap.add_argument("-o", "--output", type=Path, default=None, help="output directory (default: <src_dir>/../ast_out)")
@@ -452,6 +501,7 @@ def main():
         for name, info in classes.items()
     }
     (out_dir / "symbol_table.json").write_text(json.dumps(symbol_table, indent=2), encoding="utf-8")
+    print(f"wrote symbol table to {out_dir / 'symbol_table.json'}")
 
     records = extract_methods(classes, file_imports, parsed)
 

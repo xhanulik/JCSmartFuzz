@@ -62,6 +62,97 @@ field list of `class` for context on what state the method can touch.
   that transitively call themselves (including through overload-name
   collisions — see docstring).
 
+## Output format
+
+Three files are written (all built in `extract.py`'s `main()`). Types below
+use `<...>` for placeholders; every "type" string is `type_to_str`'d (array
+dimensions become a trailing `[]`, `void` for none).
+
+### `symbol_table.json` — the class index
+
+A single object keyed by **simple class name** (built at
+`extract.py` `main()`, from `ClassInfo`):
+
+```json
+{
+  "PinApplet": {
+    "package": "com.example",           // "" when the file has no package
+    "kind": "class",                    // "class" | "interface" | "enum"
+    "extends": "Applet",                // string; a list for multi-extends interfaces; null if none
+    "implements": ["ISO7816"],          // [] if none
+    "fields": { "referencePin": "byte[]", "triesLeft": "byte" },
+    "methods": {
+      "checkPin": [                       // one entry PER overload (keyed by name only)
+        { "return_type": "boolean", "params": [["pin", "byte[]"]], "modifiers": ["private"] }
+      ],
+      "<init>": [                         // constructors are stored under "<init>"
+        { "return_type": "void", "params": [["len", "short"]], "modifiers": ["public"] }
+      ]
+    }
+  }
+}
+```
+
+Note: in `symbol_table.json`, `params` are **`[name, type]` pairs** (2-element
+arrays). In `methods.jsonl` below, `params` are **`{name, type}` objects** —
+the two files differ here.
+
+### `methods.jsonl` — one JSON object per line (the central artifact)
+
+One record per method **and** per constructor (`"method": "<init>"`). Built by
+`_extract_one`, then enriched with the call-graph fields in `main()`:
+
+```json
+{
+  "file": "src/PinApplet.java",
+  "class": "PinApplet",
+  "method": "checkPin",                 // or "<init>" for a constructor
+  "modifiers": ["private"],
+  "return_type": "boolean",             // "void" for constructors
+  "params":  [ { "name": "pin",  "type": "byte[]" } ],
+  "throws":  [ "ISOException" ],         // [] if none
+  "locals":  [ { "name": "i",    "type": "short" } ],
+  "field_dataflow": [
+    {
+      "field": "referencePin",
+      "owner_class": "PinApplet",        // declaring class (own or inherited)
+      "type": "byte[]",
+      "reads": 1,
+      "writes": 0,
+      "first_access": "read",            // "read" | "write"
+      "classification": "read_before_write"   // "read_before_write" | "written_first"
+    }
+  ],
+  "calls": [
+    {
+      "qualifier": "Util",               // the receiver text, or null for bare/this calls
+      "method": "arrayCompare",
+      "resolved_owner": "javacard.framework.Util",  // in-repo class, import FQN, or null
+      "external": true                   // true when resolved_owner is not an in-repo class
+    }
+  ],
+  "start_line": 42,                       // null if the node has no position
+  "source": "boolean checkPin(byte[] pin) { ... }",   // verbatim brace-matched snippet; null if no start_line
+  "transitive_calls": ["PinApplet.compare"],          // full internal-call closure (not just direct)
+  "recursive": false,                                 // true if the method transitively calls itself
+  "transitive_private_helpers": ["PinApplet.compare"] // subset of transitive_calls that are private
+}
+```
+
+### `call_graph.json` — resolved edges (internal calls only)
+
+Nodes are `"Class.method"` strings; overloads collapse to one node per
+`(class, name)`:
+
+```json
+{
+  "direct":      { "PinApplet.checkPin": ["PinApplet.compare"] },
+  "transitive":  { "PinApplet.checkPin": ["PinApplet.compare"] },
+  "recursive_methods": ["PinApplet.mix"],
+  "transitive_private_helpers": { "PinApplet.checkPin": ["PinApplet.compare"] }
+}
+```
+
 ## Usage
 
 ```
