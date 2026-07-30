@@ -1,29 +1,38 @@
 /*
- * FuzzAppletSkeleton: Reusable scaffold for differential fuzzing of Java Card applets.
+ * ProfileAppletSkeleton: Reusable scaffold for PROFILING a Java Card applet
+ * operation (single-invocation worst-case cost), the counterpart to
+ * FuzzAppletSkeleton.java (differential dual-invocation).
  *
- * ONE fuzzing applet fuzzes exactly ONE operation of the target applet (the
- * each-method-a-harness model). There is therefore no INS dispatch: process()
- * calls the single generated wrapper directly.
+ * Difference from FuzzAppletSkeleton:
+ *   - FuzzApplet runs the operation TWICE (input sets A and B) and reports the
+ *     cost *difference* |costA - costB| — for differential timing fuzzing.
+ *   - ProfileApplet runs the operation ONCE and reports the single instruction
+ *     cost — for profiling / worst-case analysis (AFL++ maximizes the cost).
+ *   - Its input is therefore HALF of a FuzzApplet input: exactly one input set.
+ *     pipeline/profile/ splits FuzzApplet inputs into ProfileApplet inputs.
  *
- * This file contains the fixed infrastructure (Layer 1) that never changes.
- * The GENERATED markers (Layers 2-3) are filled automatically by the
- * harness pipeline (pipeline/harness/harness_extraction/):
+ * One ProfileApplet profiles exactly ONE operation, so (like FuzzApplet) there
+ * is no INS dispatch: process() calls the single generated wrapper directly.
+ *
+ * Everything else is shared with FuzzAppletSkeleton: the Layer 2 wrapXxx() and
+ * Layer 3 coreXxx() methods, the context (constants / error codes / fields +
+ * init), and the GENERATED markers are identical, so the same harness pipeline
+ * (pipeline/harness/harness_extraction/) fills them:
  *   - extract_context.py      -> context.json  (constants, error codes,
  *                                fields + their constructor init lines, ins_byte)
  *   - llm_extract_operation.py -> operation.json (core_method + wrapper_method)
- *   - assemble_harness.py      -> substitutes every marker below from those two
+ *   - assemble_profile.py      -> substitutes every marker below from those two
  *
  * Architecture:
- *   Layer 1 — process():         Fixed dual-invocation framing (calls the wrapper twice)
+ *   Layer 1 — process():         Fixed SINGLE-invocation framing (calls the wrapper once)
  *   Layer 2 — wrapXxx() method:  from operation.json wrapper_method — unpacks APDU, calls core
  *   Layer 3 — coreXxx() method:  from operation.json core_method — verbatim-minus-removals
  *
  * APDU format:
  *   CLA: configurable (FUZZ_CLA)
  *   INS: ignored by the applet (single operation); the driver sends a fixed FUZZ_INS
- *   P1/P2: unused at APDU level (per-input P1/P2 are inside each input set)
- *   CDATA: [size_A(2) | input_set_A(size_A) | input_set_B(remaining)]
- *     where input_set = [p1(1) | p2(1) | operation_data]
+ *   P1/P2: unused at APDU level (per-input P1/P2 are inside the input set)
+ *   CDATA: [p1(1) | p2(1) | operation_data]   (a single input set)
  */
 
 package /* GENERATED: set package name */;
@@ -46,11 +55,9 @@ public class /* GENERATED: set class name */ extends javacard.framework.Applet {
     // CLA byte — change if needed to avoid collision with the original applet
     private final static byte FUZZ_CLA = (byte) 0xB1;
 
-    // Fuzz buffer layout — holds preserved inputs and intermediate results
+    // Fuzz buffer layout — holds the preserved input set during invocation
     private final static short FUZZ_BUFFER_SIZE = (short) 520;
-    private final static short FUZZ_INPUT_OFFSET = (short) 0;       // preserved CDATA: bytes 0..255
-    private final static short FUZZ_RESULT_A_OFFSET = (short) 256;  // result A storage
-    private final static short FUZZ_RESULT_B_OFFSET = (short) 390;  // result B storage
+    private final static short FUZZ_INPUT_OFFSET = (short) 0;       // preserved CDATA
 
     // Working buffer sizes — adjust if the original applet uses larger buffers
     private final static short RECV_BUFFER_SIZE = (short) 268;
@@ -76,9 +83,9 @@ public class /* GENERATED: set class name */ extends javacard.framework.Applet {
      *  SCAFFOLD INSTANCE VARIABLES (fixed) *
      ****************************************/
 
-    // Fuzz buffer — preserves dual inputs and stores intermediate results during dual-invocation
+    // Fuzz buffer — preserves the input set during invocation
     private byte[] fuzzBuffer;
-    // Carries the Mem.instrCost measured around the last coreXxx() call out to process()
+    // Carries the Mem.instrCost measured around the coreXxx() call out to process()
     private long lastCoreCost;
 
     /*=====================================================================*
@@ -118,11 +125,11 @@ public class /* GENERATED: set class name */ extends javacard.framework.Applet {
     }
 
     /***************************************************************************
-     *  LAYER 1 — process(): Fixed dual-invocation framing                    *
+     *  LAYER 1 — process(): Fixed SINGLE-invocation framing                  *
      *                                                                         *
-     *  DO NOT MODIFY. This method is the same for every fuzzing applet.      *
-     *  It splits the APDU into two input sets, calls the operation twice,    *
-     *  and returns both results.                                              *
+     *  DO NOT MODIFY. Runs the operation ONCE on a single input set and      *
+     *  reports the instruction cost of that run to Kelinci (worst-case       *
+     *  profiling — AFL++ drives inputs toward maximum cost).                 *
      ***************************************************************************/
 
     public void process(APDU apdu) {
@@ -133,72 +140,45 @@ public class /* GENERATED: set class name */ extends javacard.framework.Applet {
         if (buffer[ISO7816.OFFSET_CLA] != FUZZ_CLA)
             ISOException.throwIt(ISO7816.SW_CLA_NOT_SUPPORTED);
 
-        // INS is ignored: this applet fuzzes exactly one operation.
+        // INS is ignored: this applet profiles exactly one operation.
 
         short totalLen = Util.makeShort((byte) 0x00, buffer[ISO7816.OFFSET_LC]);
         if (totalLen != apdu.setIncomingAndReceive())
             ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
 
-        // -------- DIFFERENTIAL FUZZING DUAL-INVOCATION --------
+        // -------- SINGLE-INVOCATION PROFILING --------
+        // CDATA is one input set: [p1(1) | p2(1) | operation_data]
 
-        if (totalLen < (short) 4) // minimum: 2 (size_A) + 1 (p1) + 1 (p2)
+        if (totalLen < (short) 2) // minimum: p1(1) + p2(1)
             ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
 
-        // Preserve entire CDATA in fuzzBuffer
+        // Preserve entire CDATA in fuzzBuffer, then lay it out for the wrapper
+        // exactly as FuzzAppletSkeleton does per run (P1/P2 in the APDU header,
+        // operation_data at OFFSET_CDATA) so wrapXxx() is byte-for-byte shared.
         Util.arrayCopyNonAtomic(buffer, ISO7816.OFFSET_CDATA,
                 fuzzBuffer, FUZZ_INPUT_OFFSET, totalLen);
 
-        // Parse framing: [size_A(2) | input_set_A(size_A) | input_set_B(remaining)]
-        short sizeA = Util.getShort(fuzzBuffer, FUZZ_INPUT_OFFSET);
-        short setA_off = (short)(FUZZ_INPUT_OFFSET + 2);
-        short setB_off = (short)(setA_off + sizeA);
-        short sizeB = (short)(totalLen - 2 - sizeA);
+        short dataLen = (short)(totalLen - 2);
+        buffer[ISO7816.OFFSET_P1] = fuzzBuffer[FUZZ_INPUT_OFFSET];
+        buffer[ISO7816.OFFSET_P2] = fuzzBuffer[(short)(FUZZ_INPUT_OFFSET + 1)];
+        if (dataLen > 0)
+            Util.arrayCopyNonAtomic(fuzzBuffer, (short)(FUZZ_INPUT_OFFSET + 2),
+                    buffer, ISO7816.OFFSET_CDATA, dataLen);
+        buffer[ISO7816.OFFSET_LC] = (byte)(dataLen & 0xFF);
 
-        // Each input_set must have at least p1(1) + p2(1) = 2 bytes
-        if (sizeA < 2 || sizeB < 2)
-            ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
+        wrapOperation(apdu, buffer);
 
-        // ---- RUN A ----
-        short dataLenA = (short)(sizeA - 2);
-        buffer[ISO7816.OFFSET_P1] = fuzzBuffer[setA_off];
-        buffer[ISO7816.OFFSET_P2] = fuzzBuffer[(short)(setA_off + 1)];
-        if (dataLenA > 0)
-            Util.arrayCopyNonAtomic(fuzzBuffer, (short)(setA_off + 2),
-                    buffer, ISO7816.OFFSET_CDATA, dataLenA);
-        buffer[ISO7816.OFFSET_LC] = (byte)(dataLenA & 0xFF);
-
-        short lenA = wrapOperation(apdu, buffer);
-        long costA = lastCoreCost;
-        if (lenA > 0)
-            Util.arrayCopyNonAtomic(buffer, (short) 0,
-                    fuzzBuffer, FUZZ_RESULT_A_OFFSET, lenA);
-
-        // ---- RUN B ----
-        short dataLenB = (short)(sizeB - 2);
-        buffer[ISO7816.OFFSET_P1] = fuzzBuffer[setB_off];
-        buffer[ISO7816.OFFSET_P2] = fuzzBuffer[(short)(setB_off + 1)];
-        if (dataLenB > 0)
-            Util.arrayCopyNonAtomic(fuzzBuffer, (short)(setB_off + 2),
-                    buffer, ISO7816.OFFSET_CDATA, dataLenB);
-        buffer[ISO7816.OFFSET_LC] = (byte)(dataLenB & 0xFF);
-
-        short lenB = wrapOperation(apdu, buffer);
-        long costB = lastCoreCost;
-        if (lenB > 0)
-            Util.arrayCopyNonAtomic(buffer, (short) 0,
-                    fuzzBuffer, FUZZ_RESULT_B_OFFSET, lenB);
-
-        Kelinci.addCost(Math.abs(costA - costB));
+        Kelinci.addCost(lastCoreCost);
     }
 
     /***************************************************************************
      *                                                                         *
      *  LAYER 2 — WRAPPER METHOD                                              *
      *                                                                         *
-     *  GENERATED: assemble_harness inserts the wrapXxx() from                 *
+     *  GENERATED: assemble_profile inserts the wrapXxx() from                 *
      *  operation.json's wrapper_method.code (llm_extract_operation.py) and    *
-     *  wires the two process() calls above to it. There is no INS dispatch —  *
-     *  this applet has exactly one operation.                                 *
+     *  wires the process() call above to it — identical to the FuzzApplet     *
+     *  wrapper; there is no INS dispatch (single operation).                  *
      *                                                                         *
      *  Each wrapper:                                                          *
      *    1. Reads P1, P2, and operation_data from buffer                      *
@@ -218,7 +198,7 @@ public class /* GENERATED: set class name */ extends javacard.framework.Applet {
      *                                                                         *
      *  LAYER 3 — CORE METHOD (VERBATIM from original applet)                 *
      *                                                                         *
-     *  GENERATED: assemble_harness inserts the coreXxx() from                 *
+     *  GENERATED: assemble_profile inserts the coreXxx() from                 *
      *  operation.json's core_method.code — a verbatim-minus-removals copy    *
      *  of the original method (llm_extract_operation.py).                     *
      *                                                                         *

@@ -6,6 +6,10 @@
  * the skeleton's dual-invocation APDU format, sends it to a Java Card
  * simulator, and reports the timing cost difference to diffuzz.
  *
+ * The GENERATED markers below (applet import, FUZZ_INS, MAX_DATA) are
+ * filled by pipeline/harness/harness_extraction/assemble_harness.py from
+ * operation.json (llm_extract_operation.py).
+ *
  * APDU format sent to the FuzzAppletSkeleton:
  *   CLA: FUZZ_CLA (0xB1)
  *   INS: operation code
@@ -16,10 +20,10 @@
  * Fuzz input file layout (fixed-offset scheme, AFL++-friendly):
  *   [p1_A(1) | p2_A(1) | len_A(1) | data_A(MAX_DATA) | p1_B(1) | p2_B(1) | len_B(1) | data_B(MAX_DATA)]
  *
- * The INS byte is NOT part of the fuzz input. It is pinned at build
- * time via the FUZZ_INS constant below — a given driver build fuzzes
- * exactly one operation of the target applet. To fuzz a different
- * operation, rebuild with a different FUZZ_INS value.
+ * The INS byte is NOT part of the fuzz input. Each applet fuzzes exactly one
+ * operation and IGNORES the INS (no dispatch), so FUZZ_INS is a fixed constant
+ * sent only so the CommandAPDU is well-formed. To fuzz a different operation,
+ * build the harness for that operation (its own applet + driver).
  *
  * Every byte has a stable position regardless of len_A/len_B values.
  * len_A and len_B are clamped to [0, MAX_DATA] and control how many
@@ -46,20 +50,20 @@ public class FuzzDriverSkeleton {
 
     /*=====================================================================*
      *  GENERATED SECTION: FUZZ_INS                                        *
-     *  Pin this driver to ONE operation of the target applet. The INS     *
-     *  byte is NOT fuzzed — it is a build-time constant so that every     *
-     *  seed AFL++ produces exercises the same handler.                    *
-     *  Must match one of the INS_XXX constants in the fuzzing applet.     *
+     *  Fixed INS byte for a well-formed APDU. The applet has a single      *
+     *  operation and ignores INS (no dispatch), so this is not a selector; *
+     *  assemble_harness still sets it from operation.json's ins_byte so    *
+     *  the value is self-documenting.                                      *
      *=====================================================================*/
 
     private static final byte FUZZ_INS = (byte) 0x00; // {{GENERATED: INS byte of operation under test}}
 
     /*=====================================================================*
      *  GENERATED SECTION: MAX_DATA                                        *
-     *  Set this to the maximum operation data size for the target applet. *
-     *  The total fuzz input file size will be:                            *
-     *    HEADER_A(3) + MAX_DATA + HEADER_B(3) + MAX_DATA                  *
-     *  Example: MAX_DATA=64 => 134 bytes per fuzz input                   *
+     *  Maximum operation data size for the target applet. assemble_harness *
+     *  emits a default (64); adjust to the operation's max data size.      *
+     *  Total fuzz input file size = 3 + MAX_DATA + 3 + MAX_DATA.          *
+     *  Example: MAX_DATA=64 => 134 bytes per fuzz input.                  *
      *=====================================================================*/
 
     private static final int MAX_DATA = 64; // {{GENERATED: adjust per target}}

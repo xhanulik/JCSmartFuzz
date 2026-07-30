@@ -18,10 +18,6 @@ The applet has four layers:
 
 Host-side diffuzz driver that feeds the applet via a Java Card simulator (e.g., jCardSim). It reads a fuzz input file produced by AFL++, constructs a `CommandAPDU`, sends it to the simulator, and reports execution cost via Kelinci's `Mem`/`Kelinci` API.
 
-### llm_extraction_prompt.md
-
-LLM prompt for extracting timing-sensitive operations from a target Java Card applet. Given the full applet source, it instructs the LLM to identify operations that process secret data with data-dependent timing, then produce the wrapper + core method pairs, field declarations, constants, and dispatcher entries needed to fill in the `{{GENERATED: ...}}` markers in both skeletons.
-
 ## Fuzz Input Layout (Fixed-Offset Scheme)
 
 The input file uses a **fixed-offset layout** so that every byte has a stable semantic role regardless of the actual data lengths. This is critical for AFL++ effectiveness — mutations at any position don't shift the meaning of other positions.
@@ -62,7 +58,7 @@ This is wrapped in a `CommandAPDU` with `CLA=0xB1`, `INS=FUZZ_INS` (build-time c
 
 ## Code Generation
 
-Both skeletons contain `{{GENERATED: ...}}` markers where LLM-extracted code is inserted for a specific target applet. Feed the target applet's source to the LLM using the prompt in `llm_extraction_prompt.md`, then paste each numbered output section into the corresponding marker.
+Both skeletons contain `{{GENERATED: ...}}` markers where extracted code is inserted for a specific target applet. The harness pipeline fills them automatically — see [`../pipeline/harness/harness_extraction`](../pipeline/harness/harness_extraction) (its editable LLM prompts live in that stage's `prompts/`).
 
 **Driver-specific generated sections:**
 - `FUZZ_INS` — INS byte of the single operation this driver build fuzzes
