@@ -1,20 +1,31 @@
 #!/usr/bin/env python3
 """
 Stage 3b (LLM + gate): the only part of harness extraction that requires
-judgment -- deciding what to strip from the core method (lifecycle guards,
-cache, state mutation, secure channel, key selection, logging -- the fixed
-categories from skeletons/llm_extraction_prompt.md) and writing the wrapper
-that unpacks APDU data into the shape the core expects.
+judgment. It picks one of two harness modes and produces the code for it:
+
+  - "inline-core": copy the target method body verbatim-minus-removals into the
+    fuzzing applet as coreXxx() and write a wrapper that unpacks the APDU and
+    calls it. For applet-level entry methods with removable APDU/secure-channel/
+    lifecycle setup. The removals are the fixed categories (lifecycle guard,
+    cache, state mutation, secure channel, key selection, logging) and are
+    fidelity-checked against the original body.
+  - "invoke-instance": copy NOTHING. The wrapper constructs a real receiver (and
+    argument objects) via the class's real public constructors (from
+    context.json's construction_api), calls the real method on it, and
+    serializes the result. For instance methods of normal (non-applet) classes
+    whose body relies on this/private state and so cannot be lifted into the
+    applet (JCMathLib's BigNat/Integer/ECPoint operations). core_method is null
+    and the fidelity check does not apply.
 
 Takes context.json from extract_context.py (the target method's exact
 source, its helper-method closure, fields/constants/error codes -- all
 gathered deterministically) and makes ONE focused API call asking for a
 strict-JSON operation spec.
 
-LLM call settings are copied from tools/candidate_narrowing/llm_final_verdict.py
-(itself copied from jcseedgen/generator.py): e-INFRA CZ
-/v1/chat/completions endpoint, gpt-oss-120b default model, LLM_API_TOKEN
-bearer auth, plain urllib.
+The LLM backend (endpoint, model, timeout, token) is resolved through the
+shared pipeline.llm_config loader -- environment variable > llm_config.ini >
+built-in default -- the same as every other LLM-calling stage. Plain urllib,
+no extra HTTP dependency.
 
 Gate (two layers, both must pass or the call is re-queried with the
 specific error appended, up to --retries times; on exhaustion the run
@@ -29,6 +40,15 @@ fails with the error printed rather than emitting a fabricated result):
      for ("diff each core method body against the original source...
      Only ALLOWED REMOVALS may differ") instead of leaving it to a human.
 
+Each/each model: one operation per method. context.json matches whatever
+extract_context.py wrote to it:
+  - a single context object (from --method) -> operation.json is a single object.
+  - a JSON list of per-method contexts (from --verdicts, several methods) ->
+    operation.json is a JSON list, one operation per element, each tagged with
+    its {class, method} target so the assemble step can pair them back up.
+A method that fails the gate is recorded in operation_errors.json and does not
+abort the rest of the list.
+
 Usage:
     export LLM_API_TOKEN=...
     py llm_extract_operation.py context.json -o operation.json
@@ -40,17 +60,37 @@ import argparse
 import difflib
 import json
 import logging
-import os
+import re
 import sys
 import urllib.error
 import urllib.request
 from pathlib import Path
 
-log = logging.getLogger(__name__)
+# LLM backend settings (endpoint/model/timeout/token) are resolved through the
+# shared pipeline config loader -- env var > llm_config.ini > default -- so no
+# provider specifics are hardcoded here.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+import llm_config
 
-E_INFRA_ENDPOINT = "https://llm.ai.e-infra.cz/v1/chat/completions"
-E_INFRA_DEFAULT_MODEL = "gpt-oss-120b"
-E_INFRA_TIMEOUT_SECONDS = 120
+# ---------------------------------------------------------------------------
+# Prompt templates live in prompts/ as editable text files (with {{marker}}
+# placeholders) so the wording can be tuned without touching this code.
+# ---------------------------------------------------------------------------
+PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
+
+
+def load_prompt(name):
+    """Read a prompt template from prompts/<name>."""
+    return (PROMPTS_DIR / name).read_text(encoding="utf-8")
+
+
+def render_prompt(template, **values):
+    """Substitute every {{name}} marker in *template* from *values* in a single
+    pass (inserted values are never re-scanned for further markers). Raises
+    KeyError if the template references a marker that was not supplied."""
+    return re.sub(r"{{\s*(\w+)\s*}}", lambda m: str(values[m.group(1)]), template)
+
+log = logging.getLogger(__name__)
 
 REMOVAL_CATEGORIES = [
     "lifecycle guard",
@@ -79,13 +119,14 @@ WRAPPER_METHOD_FIELDS = {
     "code": str,
     "data_layout_comment": str,
 }
-TOP_FIELDS = {
-    "operation_name": str,
-    "ins_name": str,
-    "timing_risk": str,
-    "core_method": dict,
-    "wrapper_method": dict,
-}
+# The wrapper's signature is fixed: the skeleton's process() calls
+# `wrapOperation(apdu, buffer)`, so the declaration must take (APDU, byte[]) in
+# that order (parameter names are free). Anything else fails to compile.
+WRAPPER_SIG_RE = re.compile(r"wrapOperation\s*\(\s*APDU\s+\w+\s*,\s*byte\s*\[\s*\]\s+\w+\s*\)")
+
+TOP_STR_FIELDS = ("operation_name", "ins_name", "timing_risk")
+TOP_FIELDS = {"mode", "operation_name", "ins_name", "timing_risk", "core_method", "wrapper_method"}
+MODES = ("inline-core", "invoke-instance")
 
 
 def _check_fields(obj, spec, label):
@@ -104,15 +145,50 @@ def _check_fields(obj, spec, label):
 
 
 def validate_operation(obj):
-    """Return None if obj matches the strict schema, else an error string."""
-    err = _check_fields(obj, TOP_FIELDS, "response")
-    if err:
-        return err
+    """Return None if obj matches the strict schema for its mode, else an error string.
 
+    Both modes share the top-level fields and the wrapper (named `wrapOperation`).
+    They differ in core_method: inline-core carries the verbatim-minus-removals
+    core object (fidelity-checked later); invoke-instance sets it to null (the
+    wrapper calls the real method on a constructed object, so nothing is copied)."""
+    if not isinstance(obj, dict):
+        return "response is not a JSON object"
+    extra = set(obj) - TOP_FIELDS
+    if extra:
+        return f"response has unexpected extra field(s): {sorted(extra)}"
+    missing = TOP_FIELDS - set(obj)
+    if missing:
+        return f"response is missing required field(s): {sorted(missing)}"
+    if obj["mode"] not in MODES:
+        return f"mode must be one of {list(MODES)}, got {obj['mode']!r}"
+    for f in TOP_STR_FIELDS:
+        if not isinstance(obj[f], str):
+            return f"{f} must be a string"
     if not obj["ins_name"].startswith("INS_") or not obj["ins_name"].isupper():
         return f"ins_name must look like INS_XXX (all-caps), got {obj['ins_name']!r}"
 
+    wrapper = obj["wrapper_method"]
+    err = _check_fields(wrapper, WRAPPER_METHOD_FIELDS, "wrapper_method")
+    if err:
+        return err
+    if wrapper["name"] != "wrapOperation":
+        return (f"wrapper_method.name must be exactly 'wrapOperation' (the fixed name the "
+                f"harness process() calls; there is no INS dispatch), got {wrapper['name']!r}")
+    if not wrapper["code"].strip():
+        return "wrapper_method.code must be non-empty"
+    if not WRAPPER_SIG_RE.search(wrapper["code"]):
+        return ("wrapper_method.code must declare exactly "
+                "`private short wrapOperation(APDU apdu, byte[] buffer)` -- that is the signature "
+                "the harness process() calls (parameter names may vary, types/order may not); "
+                "read P1/P2/CDATA from the `byte[]` buffer inside, do not change the parameters")
+
     core = obj["core_method"]
+    if obj["mode"] == "invoke-instance":
+        if core is not None:
+            return "core_method must be null in invoke-instance mode (the real method is called, not copied)"
+        return None
+
+    # inline-core: core_method is a verbatim-minus-removals copy.
     err = _check_fields(core, CORE_METHOD_FIELDS, "core_method")
     if err:
         return err
@@ -130,15 +206,6 @@ def validate_operation(obj):
             return f"core_method.removed_lines[{i}] has an invalid line range {r['start_line']}-{r['end_line']}"
     if not all(isinstance(f, str) for f in core["field_mapping"]):
         return "core_method.field_mapping must be a list of strings"
-
-    wrapper = obj["wrapper_method"]
-    err = _check_fields(wrapper, WRAPPER_METHOD_FIELDS, "wrapper_method")
-    if err:
-        return err
-    if not wrapper["name"].startswith("wrap"):
-        return f"wrapper_method.name must start with 'wrap', got {wrapper['name']!r}"
-    if not wrapper["code"].strip():
-        return "wrapper_method.code must be non-empty"
 
     return None
 
@@ -190,6 +257,29 @@ def extract_json(text):
     return json.loads(text[start:end + 1])
 
 
+def op_summary(obj):
+    """One-line 'what was produced' for logs, tolerant of a null core_method."""
+    core = obj.get("core_method")
+    produced = f"{core['name']} / wrapOperation" if core else "wrapOperation (invoke-instance, real method)"
+    return f"[{obj['mode']}] {obj['operation_name']} -> {produced}"
+
+
+def render_construction_api(api):
+    """Render context.json's construction_api (public ctor + method signatures per
+    class) into the prompt block the invoke-instance wrapper builds against."""
+    if not api:
+        return "  (none -- inline-core targets don't need this)"
+    blocks = []
+    for cls, info in api.items():
+        lines = [f"class {cls} (package {info.get('package') or '(default)'}):"]
+        for c in info.get("constructors", []):
+            lines.append(f"    ctor:   {c}")
+        for m in info.get("methods", []):
+            lines.append(f"    method: {m}")
+        blocks.append("\n".join(lines))
+    return "\n\n".join(blocks)
+
+
 def build_prompt(context):
     target = context["target"]
     helpers_block = "\n\n".join(
@@ -207,6 +297,7 @@ def build_prompt(context):
     ) or "  (none)"
     constants_block = "\n".join(f"  - {c['declaration'].strip()}" for c in context["constants"]) or "  (none)"
     error_codes_block = "\n".join(f"  - {e['declaration'].strip()}" for e in context["error_codes"]) or "  (none)"
+    construction_api_block = render_construction_api(context.get("construction_api", {}))
 
     hint = ""
     if context.get("verdict_hint"):
@@ -215,87 +306,20 @@ def build_prompt(context):
                 f"leak_mechanism={v.get('leak_mechanism')!r}, rationale={v.get('rationale')!r}. "
                 f"Use this as a starting hypothesis, not a constraint -- verify against the actual code.\n")
 
-    return f"""\
-You are extracting ONE timing-sensitive operation from a Java Card applet
-into a wrapper + core method pair for a differential-fuzzing harness. The
-operation to extract has already been chosen (this is not your job) --
-you only need to do the core/wrapper split for the method below.
-{hint}
-=== Target method (line-numbered; line numbers are relative to THIS listing) ===
-Class: {target['class']}
-Method: {target['method']}
-{numbered_source}
-
-=== Internal helper methods this method calls (context only -- do not extract these, they are copied into the harness package verbatim) ===
-{helpers_block}
-
-=== Non-local instance fields this method (or its helpers) touch, with how the original constructor initializes them ===
-{fields_block}
-
-=== Constants available (paste verbatim if the core references them) ===
-{constants_block}
-
-=== Error codes available ===
-{error_codes_block}
-
-=== Task ===
-Produce a core method (verbatim-minus-removals copy of the target method's
-BODY) and a brand-new wrapper method, following these rules:
-
-CORE METHOD:
-- Keep ALL timing-sensitive logic verbatim: crypto API calls, comparisons/
-  validations on secret data, branches/loops depending on secret data,
-  array accesses indexed by secret data, error throws that are part of the
-  secret-dependent logic.
-- You MAY remove lines only in these categories, and EVERY removal must be
-  declared in removed_lines: {REMOVAL_CATEGORIES}
-  ("lifecycle guard" = init/setup checks; "cache" = persistent lookup/
-  store; "state mutation" = persistent counters/flags unrelated to timing;
-  "secure channel" = APDU encryption/decryption wrapping; "key selection"
-  = choosing among multiple stored keys by id, replaced by the wrapper
-  loading the one correct key; "logging" = audit/log writes.)
-- Do NOT reformat, rename variables, or "clean up" anything else. Every
-  line you don't declare as removed must appear in core_method.code
-  EXACTLY as in the target method listing above (this is mechanically
-  verified -- an undeclared change will be rejected).
-- Name it coreXxx (CamelCase Xxx derived from the operation).
-- field_mapping: list the exact original field names the core references.
-- precondition: what the wrapper must set up before calling this core (or
-  "" if nothing beyond normal parameters).
-
-WRAPPER METHOD:
-- Entirely new code (nothing copied from the original). Reads P1/P2/CDATA
-  from `buffer` (a `byte[]`), validates sizes, loads any secret/public data
-  the core needs into the fields/buffers listed above (or into local
-  variables/parameters passed to the core), calls the core, formats the
-  result into `buffer[0..]`, returns the output size as `short`.
-- Signature: `private short wrapXxx(APDU apdu, byte[] buffer)`.
-- Name it wrapXxx to match the core's Xxx.
-- data_layout_comment: one line describing the per-input-set data layout,
-  e.g. "p1=pin_length | p2=0x00 | reference_pin(8) | guess_pin(8)". Every
-  piece of data the original method read from persistent/instance state
-  (keys, PINs, seeds, config) must appear here as explicit input -- nothing
-  implicit, since the fuzzer must control it.
-
-Respond with STRICT JSON ONLY (no prose, no markdown fences), matching
-exactly this shape:
-{{
-  "operation_name": "VerifyPin",
-  "ins_name": "INS_VERIFY_PIN",
-  "timing_risk": "one-sentence description of the specific timing-vulnerable construct",
-  "core_method": {{
-    "name": "coreVerifyPin",
-    "code": "full java method source, verbatim-minus-declared-removals",
-    "removed_lines": [{{"start_line": 1, "end_line": 2, "category": "lifecycle guard", "description": "..."}}],
-    "field_mapping": ["referencePin"],
-    "precondition": "referencePin loaded by wrapper before calling"
-  }},
-  "wrapper_method": {{
-    "name": "wrapVerifyPin",
-    "code": "full java method source",
-    "data_layout_comment": "p1=... | p2=... | field(size) | ..."
-  }}
-}}"""
+    return render_prompt(
+        load_prompt("extract_operation.md"),
+        hint=hint,
+        target_class=target["class"],
+        target_method=target["method"],
+        numbered_source=numbered_source,
+        helpers_block=helpers_block,
+        fields_block=fields_block,
+        constants_block=constants_block,
+        error_codes_block=error_codes_block,
+        construction_api_block=construction_api_block,
+        suggested_mode=context.get("suggested_mode", "inline-core"),
+        removal_categories=REMOVAL_CATEGORIES,
+    )
 
 
 def mock_llm(prompt, attempt, context):
@@ -308,7 +332,7 @@ def mock_llm(prompt, attempt, context):
     lines = target["source"].splitlines()
     op_name = target["method"][0].upper() + target["method"][1:]
     core_name = f"core{op_name}"
-    wrapper_name = f"wrap{op_name}"
+    wrapper_name = "wrapOperation"  # fixed name; the harness process() calls it (no INS dispatch)
     ins_name = f"INS_{target['method'].upper()}"
 
     # fixture's target method has the lifecycle guard on (1-indexed) lines 2-4:
@@ -328,7 +352,10 @@ def mock_llm(prompt, attempt, context):
         removed_lines = [{"start_line": 2, "end_line": 4, "category": "lifecycle guard",
                            "description": "initialization guard, not timing-relevant"}]
 
+    # The mock only exercises the inline-core path (the fixture is an applet
+    # method). invoke-instance wrappers are class-specific and not mocked.
     return json.dumps({
+        "mode": "inline-core",
         "operation_name": op_name,
         "ins_name": ins_name,
         "timing_risk": "[mock] early-exit comparison on secret data",
@@ -361,7 +388,7 @@ def call_llm(prompt, model, api_token, timeout):
     }).encode("utf-8")
 
     req = urllib.request.Request(
-        E_INFRA_ENDPOINT,
+        llm_config.endpoint(),
         data=body,
         headers={"Authorization": f"Bearer {api_token}", "Content-Type": "application/json"},
         method="POST",
@@ -414,25 +441,47 @@ def get_operation(context, model, api_token, timeout, retries, mock):
             log.warning("attempt %d: %s", attempt + 1, last_error)
             continue
 
-        diff = fidelity_diff(target_source, obj["core_method"]["removed_lines"], obj["core_method"]["code"])
-        if diff is not None:
-            last_error = f"fidelity check failed -- core_method.code differs from the original beyond declared removed_lines:\n{diff}"
-            log.warning("attempt %d: fidelity check failed", attempt + 1)
-            continue
+        # Fidelity diff applies only to inline-core (a verbatim body copy).
+        # invoke-instance copies nothing -- it calls the real method -- so there
+        # is no body to diff.
+        if obj["mode"] == "inline-core":
+            diff = fidelity_diff(target_source, obj["core_method"]["removed_lines"], obj["core_method"]["code"])
+            if diff is not None:
+                last_error = f"fidelity check failed -- core_method.code differs from the original beyond declared removed_lines:\n{diff}"
+                log.warning("attempt %d: fidelity check failed", attempt + 1)
+                continue
 
         return obj, attempt + 1, None
 
     return None, retries + 1, last_error
 
 
+def compact_target(context):
+    """{'class', 'method'} identity of a context object -- enough for the
+    assemble step to pair an operation back to its context list element, without
+    duplicating the full target source into operation.json."""
+    t = context.get("target", {})
+    return {"class": t.get("class"), "method": t.get("method")}
+
+
+def target_label(context):
+    """'Class.method' identifier for a context object (for logs)."""
+    t = compact_target(context)
+    return f"{t['class']}.{t['method']}"
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("context_json", type=Path)
-    ap.add_argument("-o", "--output", type=Path, default=Path("operation.json"))
+    ap.add_argument("context_json", type=Path,
+                    help="context.json from extract_context.py: a single context object "
+                         "(--method) or a JSON list of per-method contexts (--verdicts)")
+    ap.add_argument("-o", "--output", type=Path, default=Path("operation.json"),
+                    help="operation.json; a single object for a single context, or a JSON list "
+                         "(one tagged operation per method) for a list context")
     ap.add_argument("--errors-output", type=Path, default=Path("operation_errors.json"))
-    ap.add_argument("--model", default=E_INFRA_DEFAULT_MODEL)
-    ap.add_argument("--api-token", default=None, help="falls back to LLM_API_TOKEN env var")
-    ap.add_argument("--timeout", type=float, default=E_INFRA_TIMEOUT_SECONDS)
+    ap.add_argument("--model", default=None, help="overrides the model from env/llm_config.ini")
+    ap.add_argument("--api-token", default=None, help="falls back to LLM_API_TOKEN env var / llm_config.ini")
+    ap.add_argument("--timeout", type=float, default=None, help="overrides the timeout from env/llm_config.ini")
     ap.add_argument("--retries", type=int, default=2)
     ap.add_argument("--mock", action="store_true")
     ap.add_argument("-v", "--verbose", action="store_true")
@@ -441,25 +490,57 @@ def main():
     logging.basicConfig(level=logging.INFO if args.verbose else logging.WARNING,
                          format="%(levelname)s %(message)s")
 
-    api_token = args.api_token or os.environ.get("LLM_API_TOKEN")
+    api_token = args.api_token or llm_config.api_token()
     if not args.mock and not api_token:
-        print("error: LLM_API_TOKEN not set and --api-token not passed (use --mock to test without the API)",
+        print("error: no API token (set LLM_API_TOKEN, pass --api-token, or set it in llm_config.ini; use --mock to test without the API)",
               file=sys.stderr)
         sys.exit(1)
 
-    context = json.loads(args.context_json.read_text(encoding="utf-8"))
+    # Resolve the backend once (env var > llm_config.ini > default); model/timeout
+    # are unused in --mock mode so we don't require config there.
+    if args.mock:
+        model, timeout = args.model, args.timeout
+    else:
+        model = args.model or llm_config.model()
+        timeout = args.timeout if args.timeout is not None else llm_config.timeout()
 
-    obj, attempts, err = get_operation(context, args.model, api_token, args.timeout, args.retries, args.mock)
+    data = json.loads(args.context_json.read_text(encoding="utf-8"))
 
-    if obj is None:
-        print(f"FAIL: gave up after {attempts} attempt(s): {err}", file=sys.stderr)
-        args.errors_output.write_text(json.dumps({"attempts": attempts, "error": err}, indent=2), encoding="utf-8")
-        sys.exit(1)
+    # A single context object (from --method) -> a single operation object, as
+    # before. A list of contexts (from --verdicts, several methods) -> a list of
+    # operations, each tagged with its target so the assemble step can pair them.
+    if isinstance(data, dict):
+        obj, attempts, err = get_operation(data, model, api_token, timeout, args.retries, args.mock)
+        if obj is None:
+            print(f"FAIL: gave up after {attempts} attempt(s): {err}", file=sys.stderr)
+            args.errors_output.write_text(json.dumps({"attempts": attempts, "error": err}, indent=2), encoding="utf-8")
+            sys.exit(1)
+        print(f"OK ({attempts} attempt(s)): {op_summary(obj)}", file=sys.stderr)
+        args.output.write_text(json.dumps(obj, indent=2), encoding="utf-8")
+        print(f"wrote {args.output}", file=sys.stderr)
+        return
 
-    print(f"OK ({attempts} attempt(s)): {obj['operation_name']} -> "
-          f"{obj['core_method']['name']} / {obj['wrapper_method']['name']}", file=sys.stderr)
-    args.output.write_text(json.dumps(obj, indent=2), encoding="utf-8")
-    print(f"wrote {args.output}", file=sys.stderr)
+    print(f"{len(data)} method context(s) in {args.context_json}", file=sys.stderr)
+    operations, errors = [], []
+    for context in data:
+        label = target_label(context)
+        obj, attempts, err = get_operation(context, model, api_token, timeout, args.retries, args.mock)
+        if obj is None:
+            print(f"FAIL {label}: gave up after {attempts} attempt(s): {err}", file=sys.stderr)
+            errors.append({"target": compact_target(context), "attempts": attempts, "error": err})
+            continue
+        print(f"OK {label} ({attempts} attempt(s)): {op_summary(obj)}", file=sys.stderr)
+        # Tag each operation with its target {class, method} so assemble_harness
+        # can match it to the right context list element.
+        operations.append({"target": compact_target(context), **obj})
+
+    args.output.write_text(json.dumps(operations, indent=2), encoding="utf-8")
+    if errors:
+        args.errors_output.write_text(json.dumps(errors, indent=2), encoding="utf-8")
+    print(f"\n{len(operations)}/{len(data)} operation(s) -> {args.output}"
+          + (f"; {len(errors)} failed -> {args.errors_output}" if errors else ""),
+          file=sys.stderr)
+    sys.exit(1 if errors else 0)
 
 
 if __name__ == "__main__":
