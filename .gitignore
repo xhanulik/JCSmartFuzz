@@ -25,3 +25,10 @@ replay_pid*
 
 __pycache__
 .idea
+
+# Local LLM backend config (endpoint/model/token) -- never commit; see llm_config.ini.example
+llm_config.ini
+
+# Generated files
+*/errors.jsonl
+harness-out/
