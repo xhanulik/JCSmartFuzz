@@ -1,9 +1,12 @@
 """LLM-based initial seed generator for JCSmartFuzz campaigns.
 
-Unlike the AFL++ side-car in jcfuzzgen/llm_seed_generator/, this generator runs
-*before* fuzzing starts and produces the initial corpus.  It reads the target
-FuzzApplet Java source, extracts the relevant method(s) via SourceReader, and
-asks the LLM to produce seeds covering timing-sensitive branches.
+Unlike the AFL++ side-car in ../sidecar/, this generator runs *before* fuzzing
+starts and produces the initial corpus. It works entirely from the JSON the
+harness-extraction stage already produced -- `operation.json` (and optionally
+`context.json`) -- rather than re-parsing the FuzzApplet source: `operation.json`
+already contains the wrapper method (the exact byte->parameter unpacking), the
+core method (the timing-sensitive logic), and a `data_layout_comment`. The LLM
+is asked to produce seeds that drive those branches.
 
 The generated seeds conform to the fixed-offset layout consumed by every
 generated FuzzDriverXxx.java:
@@ -12,11 +15,8 @@ generated FuzzDriverXxx.java:
     | p1_B(1) | p2_B(1) | len_B(1) | data_B(MAX_DATA) ]
     Total: 6 + 2 × MAX_DATA bytes
 
-Reuses SourceReader from jcfuzzgen/llm_seed_generator/ (imported via sys.path).
-
 Extension points
 ----------------
-- ``read_source_context()``        -- override to change source extraction.
 - ``build_prompt()``               -- override to tune the prompt.
 - ``call_llm()``                   -- override to use a different backend.
 - ``parse_seeds_from_response()``  -- override for a different output format.
@@ -27,43 +27,50 @@ import hashlib
 import json
 import logging
 import os
+import re
 import sys
 import urllib.error
 import urllib.request
 from pathlib import Path
 
-# ---------------------------------------------------------------------------
-# Reuse SourceReader from jcfuzzgen/llm_seed_generator/
-# ---------------------------------------------------------------------------
+# LLM backend settings (endpoint/model/timeout/token) are resolved through the
+# shared pipeline config loader -- env var > llm_config.ini > default -- so no
+# provider specifics are hardcoded here.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+import llm_config
 
-_LLM_GEN_DIR = Path(__file__).resolve().parent.parent / "jcfuzzgen" / "llm_seed_generator"
-if str(_LLM_GEN_DIR) not in sys.path:
-    sys.path.insert(0, str(_LLM_GEN_DIR))
+# ---------------------------------------------------------------------------
+# Prompt templates live in prompts/ as editable text files (with {{marker}}
+# placeholders) so the wording can be tuned without touching this code.
+# ---------------------------------------------------------------------------
+PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
 
-try:
-    from source_reader import SourceReader
-    HAS_SOURCE_READER = True
-except ImportError:
-    HAS_SOURCE_READER = False
-    SourceReader = None  # type: ignore[assignment,misc]
+
+def load_prompt(name):
+    """Read a prompt template from prompts/<name>."""
+    return (PROMPTS_DIR / name).read_text(encoding="utf-8")
+
+
+def render_prompt(template, **values):
+    """Substitute every {{name}} marker in *template* from *values* in a single
+    pass (inserted values are never re-scanned for further markers). Raises
+    KeyError if the template references a marker that was not supplied."""
+    return re.sub(r"{{\s*(\w+)\s*}}", lambda m: str(values[m.group(1)]), template)
+
 
 log = logging.getLogger(__name__)
-
-E_INFRA_ENDPOINT = "https://llm.ai.e-infra.cz/v1/chat/completions"
-E_INFRA_DEFAULT_MODEL = "gpt-oss-120b"
-E_INFRA_TIMEOUT_SECONDS = 120
-
 
 class LLMSeedGenerator:
     """Generates initial corpus seeds using an LLM.
 
-    Reads a FuzzApplet Java source file, extracts the relevant wrapper and core
-    method(s) via SourceReader, and calls an LLM to produce hex-encoded seeds
-    that maximally cover timing-sensitive branches in the target operation.
+    Reads the harness-extraction ``operation.json`` (wrapper + core methods and
+    data layout) and calls an LLM to produce hex-encoded seeds that maximally
+    cover timing-sensitive branches in the target operation.
 
     Lifecycle::
 
-        gen = LLMSeedGenerator(source_path, output_dir, op_name="HmacSha160")
+        operation = json.load(open("operation.json"))
+        gen = LLMSeedGenerator(operation, output_dir, max_data=64)
         gen.run_once()   # one-shot
         # or
         gen.run(count=3) # multiple cycles, seeds deduplicated across runs
@@ -71,42 +78,39 @@ class LLMSeedGenerator:
     Extension points — see the per-method docstrings below.
     """
 
-    def __init__(self, source_code_path, seed_output_dir,
-                 op_name=None, max_data=None,
-                 model=E_INFRA_DEFAULT_MODEL, api_token=None,
-                 print_prompt=False, llm_timeout=E_INFRA_TIMEOUT_SECONDS):
+    def __init__(self, operation, seed_output_dir,
+                 max_data=None, context=None,
+                 model=None, api_token=None,
+                 print_prompt=False, llm_timeout=None):
         """
         Args:
-            source_code_path: Path to the ``*FuzzApplet.java`` source file.
+            operation:        Parsed ``operation.json`` dict from the
+                              harness-extraction stage (operation_name,
+                              timing_risk, core_method, wrapper_method).
             seed_output_dir:  Directory where seed files are written.
-            op_name:          Operation name ``Xxx``.  When set, the prompt
-                              contains only ``wrap<Xxx>`` and ``core<Xxx>``
-                              extracted from the source.  When ``None``, the
-                              full class is used.
             max_data:         ``MAX_DATA`` value for the operation.  When set,
                               the prompt and length validation use this value.
                               When ``None``, the LLM is instructed to infer it
-                              from the source.
-            model:            Model name on the e-INFRA CZ endpoint.
+                              from the layout.
+            context:          Optional parsed ``context.json`` dict (fields,
+                              constants, ins_byte) for extra prompt context.
+            model:            Model name; when None, resolved from
+                              env/llm_config.ini via pipeline.llm_config.
             api_token:        Bearer token.  Falls back to ``LLM_API_TOKEN``
                               env var when ``None``.
             print_prompt:     Print the prompt to stdout before each cycle.
             llm_timeout:      Seconds to wait for the LLM API response.
         """
-        if not HAS_SOURCE_READER:
-            raise ImportError(
-                "SourceReader not found. "
-                "Ensure jcfuzzgen/llm_seed_generator/ exists in the repo.")
-
-        self.source_code_path = source_code_path
-        self.op_name = op_name
+        self.operation = operation
+        self.context = context or {}
+        self.op_name = operation.get("operation_name")
         self.max_data = max_data
-        self.source_reader = SourceReader(source_code_path)
         self.seed_output_dir = seed_output_dir
-        self.model = model
-        self.api_token = api_token or os.environ.get("LLM_API_TOKEN")
+        # Resolve backend settings via env var > llm_config.ini > default.
+        self.model = model or llm_config.model()
+        self.api_token = api_token or llm_config.api_token()
         self.print_prompt = print_prompt
-        self.llm_timeout = llm_timeout
+        self.llm_timeout = llm_timeout if llm_timeout is not None else llm_config.timeout()
         os.makedirs(seed_output_dir, exist_ok=True)
 
         # Deduplication: hashes of seeds already in the output directory so
@@ -132,34 +136,11 @@ class LLMSeedGenerator:
         self.seed_counter = max_existing_id + 1
 
     # ==================================================================
-    # Has a working default via SourceReader — override to customise.
-    # ==================================================================
-
-    def read_source_context(self):
-        """Return source code of the target operation for the LLM prompt.
-
-        When ``self.op_name`` is set, returns just ``wrap<OpName>`` and
-        ``core<OpName>`` extracted from the source (same strategy as the
-        jcfuzzgen AFL++ side-car).  Otherwise, falls back to full-class
-        extraction.
-
-        CAN be overridden to return a hand-written summary, read multiple
-        files, or swap in a different extraction strategy.
-
-        Returns:
-            str: Source code snippet or full-class text.
-        """
-        if self.op_name:
-            return self.source_reader.build_method_context(
-                [f"wrap{self.op_name}", f"core{self.op_name}"])
-        return self.source_reader.build_context()
-
-    # ==================================================================
     # MUST implement — no sensible default is possible here.
     # ==================================================================
 
     def call_llm(self, prompt):
-        """Send *prompt* to the e-INFRA CZ AI API and return the reply text.
+        """Send *prompt* to the configured LLM API and return the reply text.
 
         Uses the OpenAI-compatible ``/v1/chat/completions`` endpoint.
 
@@ -186,7 +167,7 @@ class LLMSeedGenerator:
         }).encode("utf-8")
 
         req = urllib.request.Request(
-            E_INFRA_ENDPOINT,
+            llm_config.endpoint(),
             data=body,
             headers={
                 "Authorization": f"Bearer {self.api_token}",
@@ -218,18 +199,27 @@ class LLMSeedGenerator:
     # SHOULD consider overriding — the defaults work but are generic.
     # ==================================================================
 
-    def build_prompt(self, source_context):
-        """Build the LLM prompt from source code.
+    def build_prompt(self):
+        """Build the LLM prompt from the harness-extraction JSON (self.operation).
+
+        Uses the wrapper method (the exact byte->parameter unpacking), the core
+        method (the timing-sensitive logic), and the data_layout_comment -- all
+        already computed upstream, so no Java source is re-parsed here.
 
         CAN be overridden to tune wording, add extra constraints, or include
         previously generated seeds as negative examples.
 
-        Args:
-            source_context: str from ``read_source_context()``.
-
         Returns:
             str: The prompt to send to the LLM.
         """
+        wrapper = self.operation.get("wrapper_method", {}) or {}
+        core = self.operation.get("core_method", {}) or {}
+        data_layout = wrapper.get("data_layout_comment") or "(not specified)"
+        wrapper_code = wrapper.get("code") or "(not available)"
+        core_code = core.get("code") or "(not available)"
+        timing_risk = self.operation.get("timing_risk") or "(not specified)"
+        operation_name = self.op_name or "(unknown)"
+
         if self.max_data is not None:
             seed_size_info = (
                 f"MAX_DATA = {self.max_data}  "
@@ -254,90 +244,24 @@ class LLMSeedGenerator:
             "buffer[ISO7816.OFFSET_CDATA] = start of data"
         )
 
-        return f"""\
-You are a fuzzing expert specialising in timing side-channel detection.
-Your goal is to generate an initial corpus of seeds for a differential fuzzing
-campaign targeting a Java Card applet operation.
+        length_note = (
+            f"{(6 + 2 * self.max_data) * 2} hex characters"
+            if self.max_data is not None
+            else "6 + 2*MAX_DATA bytes, expressed as 12 + 4*MAX_DATA hex chars"
+        )
 
-Each seed encodes TWO independent invocations (A and B) of the same operation.
-The applet executes the operation once with (p1_A, p2_A, len_A, data_A) and
-once with (p1_B, p2_B, len_B, data_B) under identical applet state.  A timing
-side-channel exists when the two executions take different code paths and
-produce different instruction counts.
-
-=== 1. Fuzzing input format ===
-{input_format}
-{seed_size_info}
-
-Bytes 0–2       : p1_A, p2_A, len_A  (one byte each)
-Bytes 3 – 3+MAX_DATA-1      : data_A slot (MAX_DATA bytes, padded)
-Bytes 3+MAX_DATA – 5+MAX_DATA : p1_B, p2_B, len_B  (one byte each)
-Bytes 6+MAX_DATA – 6+2*MAX_DATA-1 : data_B slot (MAX_DATA bytes, padded)
-
-=== 2. Mapping of one input half to the actual APDU ===
-{input_mapping}
-
-=== 3. Fuzzed source code ===
-{source_context}
-
-=== Instructions ===
-Examine the conditional branches in the source (section 3) that depend on
-p1, p2, len, or data content.  Generate seeds that:
-
-- Set A and B halves to enter OPPOSITE branches of timing-sensitive conditions
-  (e.g. different p1/p2/len values, boundary data byte patterns).
-- Cover edge values: p1=0 and p1=max, p2=0 and p2=max, len=0 and len=MAX_DATA.
-- Include data patterns targeting known branches:
-    all-zeros, all-0xFF, MSB=0x00 vs MSB=0x80, alternating 0x55/0xAA.
-- Produce structurally diverse seeds: vary p1, p2, len, and data independently
-  rather than changing all parameters at once.
-- Pair boundary values: e.g. (p1_A=1, p1_B=max) to exercise loop-bound paths.
-
-Return ONLY raw hex-encoded seeds, one per line.  No prose, no code fences,
-no labels, no commentary.  Each line must represent a complete seed of the
-correct length ({(6 + 2 * self.max_data) * 2} hex characters).""" \
-            if self.max_data is not None else f"""\
-You are a fuzzing expert specialising in timing side-channel detection.
-Your goal is to generate an initial corpus of seeds for a differential fuzzing
-campaign targeting a Java Card applet operation.
-
-Each seed encodes TWO independent invocations (A and B) of the same operation.
-The applet executes the operation once with (p1_A, p2_A, len_A, data_A) and
-once with (p1_B, p2_B, len_B, data_B) under identical applet state.  A timing
-side-channel exists when the two executions take different code paths and
-produce different instruction counts.
-
-=== 1. Fuzzing input format ===
-{input_format}
-{seed_size_info}
-
-Bytes 0–2       : p1_A, p2_A, len_A  (one byte each)
-Bytes 3 – 3+MAX_DATA-1      : data_A slot (MAX_DATA bytes, padded)
-Bytes 3+MAX_DATA – 5+MAX_DATA : p1_B, p2_B, len_B  (one byte each)
-Bytes 6+MAX_DATA – 6+2*MAX_DATA-1 : data_B slot (MAX_DATA bytes, padded)
-
-=== 2. Mapping of one input half to the actual APDU ===
-{input_mapping}
-
-=== 3. Fuzzed source code ===
-{source_context}
-
-=== Instructions ===
-Examine the conditional branches in the source (section 3) that depend on
-p1, p2, len, or data content.  Generate seeds that:
-
-- Set A and B halves to enter OPPOSITE branches of timing-sensitive conditions
-  (e.g. different p1/p2/len values, boundary data byte patterns).
-- Cover edge values: p1=0 and p1=max, p2=0 and p2=max, len=0 and len=MAX_DATA.
-- Include data patterns targeting known branches:
-    all-zeros, all-0xFF, MSB=0x00 vs MSB=0x80, alternating 0x55/0xAA.
-- Produce structurally diverse seeds: vary p1, p2, len, and data independently
-  rather than changing all parameters at once.
-- Pair boundary values: e.g. (p1_A=1, p1_B=max) to exercise loop-bound paths.
-
-Return ONLY raw hex-encoded seeds, one per line.  No prose, no code fences,
-no labels, no commentary.  Each line must represent a complete seed of the
-correct length (6 + 2*MAX_DATA bytes, expressed as 12 + 4*MAX_DATA hex chars)."""
+        return render_prompt(
+            load_prompt("seed_generation.md"),
+            operation_name=operation_name,
+            timing_risk=timing_risk,
+            input_format=input_format,
+            seed_size_info=seed_size_info,
+            input_mapping=input_mapping,
+            data_layout=data_layout,
+            wrapper_code=wrapper_code,
+            core_code=core_code,
+            length_note=length_note,
+        )
 
     def parse_seeds_from_response(self, response):
         """Parse LLM response text into seed byte strings.
@@ -384,7 +308,7 @@ correct length (6 + 2*MAX_DATA bytes, expressed as 12 + 4*MAX_DATA hex chars).""
 
         Uses SHA-256 to skip identical seeds across calls and restarts.
         Filenames follow the ``llm_seed_XXXXXX`` pattern used by the
-        jcfuzzgen AFL++ side-car, so both tools can write to the same
+        sidecar AFL++ generator, so both tools can write to the same
         directory without collisions.
 
         CAN be overridden for custom naming, size limits, or extra validation.
@@ -410,13 +334,13 @@ correct length (6 + 2*MAX_DATA bytes, expressed as 12 + 4*MAX_DATA hex chars).""
     # ==================================================================
 
     def run_once(self):
-        """Run one generation cycle: read source → call LLM → write seeds.
+        """Run one generation cycle: build prompt from operation.json → call
+        LLM → write seeds.
 
         Returns:
             int: Number of new seeds written in this cycle.
         """
-        source_context = self.read_source_context()
-        prompt = self.build_prompt(source_context)
+        prompt = self.build_prompt()
 
         log.info("Calling LLM (prompt %d chars, model %s) ...",
                  len(prompt), self.model)
@@ -449,8 +373,8 @@ correct length (6 + 2*MAX_DATA bytes, expressed as 12 + 4*MAX_DATA hex chars).""
             int: Total number of unique seeds written.
         """
         log.info("LLM seed generator — initial corpus mode")
-        log.info("  Source      : %s", self.source_code_path)
-        log.info("  Operation   : %s", self.op_name or "(full class)")
+        log.info("  Operation   : %s", self.op_name or "(unknown)")
+        log.info("  MAX_DATA    : %s", self.max_data if self.max_data is not None else "(symbolic)")
         log.info("  Output dir  : %s", self.seed_output_dir)
         log.info("  Model       : %s", self.model)
         log.info("  Cycles      : %d", count)

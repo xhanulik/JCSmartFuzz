@@ -38,10 +38,10 @@ import sys
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
-# Optionally reuse the applet parser from drivergen/
+# Optionally reuse the applet parser from ../../harness/drivergen/
 # ---------------------------------------------------------------------------
 
-_DRIVERGEN = Path(__file__).resolve().parent.parent / 'drivergen'
+_DRIVERGEN = Path(__file__).resolve().parent.parent.parent / 'harness' / 'drivergen'
 sys.path.insert(0, str(_DRIVERGEN))
 
 try:
@@ -285,8 +285,8 @@ def main() -> None:
         # Applet mode: parse operations and generate per-operation seed directories
         if not HAS_APPLET_PARSER:
             print(
-                'ERROR: drivergen/generate_drivers.py not found. '
-                'Run from the repo root or add drivergen/ to PYTHONPATH.',
+                'ERROR: harness/drivergen/generate_drivers.py not found. '
+                'Run from the repo root or add harness/drivergen/ to PYTHONPATH.',
                 file=sys.stderr
             )
             sys.exit(1)
