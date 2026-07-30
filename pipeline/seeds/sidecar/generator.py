@@ -12,21 +12,41 @@ import hashlib
 import json
 import logging
 import os
+import re
 import sys
 import time
 import urllib.error
 import urllib.request
+from pathlib import Path
 
 from afl_stats_reader import AFLStatsReader, parse_queue_name
 from source_reader import SourceReader
 
+# ---------------------------------------------------------------------------
+# Prompt templates live in prompts/ as editable text files (with {{marker}}
+# placeholders) so the wording can be tuned without touching this code.
+# ---------------------------------------------------------------------------
+PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
+
+
+def load_prompt(name):
+    """Read a prompt template from prompts/<name>."""
+    return (PROMPTS_DIR / name).read_text(encoding="utf-8")
+
+
+def render_prompt(template, **values):
+    """Substitute every {{name}} marker in *template* from *values* in a single
+    pass (inserted values are never re-scanned for further markers). Raises
+    KeyError if the template references a marker that was not supplied."""
+    return re.sub(r"{{\s*(\w+)\s*}}", lambda m: str(values[m.group(1)]), template)
+
 log = logging.getLogger(__name__)
 
-# e-INFRA CZ AI-as-a-Service (OpenAI-compatible) chat completions endpoint.
-# See https://docs.cerit.io/en/docs/ai-as-a-service/ai-api
-E_INFRA_ENDPOINT = "https://llm.ai.e-infra.cz/v1/chat/completions"
-E_INFRA_DEFAULT_MODEL = "gpt-oss-120b"
-E_INFRA_TIMEOUT_SECONDS = 120
+# LLM backend settings (endpoint/model/timeout/token) are resolved through the
+# shared pipeline config loader -- env var > llm_config.ini > default -- so no
+# provider specifics are hardcoded here.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+import llm_config
 
 
 def _parse_ab_halves(content):
@@ -79,8 +99,8 @@ class LLMSeedGenerator:
     """
 
     def __init__(self, source_code_path, afl_out_dir, seed_output_dir,
-                 op_name=None, model=E_INFRA_DEFAULT_MODEL, api_token=None,
-                 print_prompt=False, llm_timeout=E_INFRA_TIMEOUT_SECONDS):
+                 op_name=None, model=None, api_token=None,
+                 print_prompt=False, llm_timeout=None):
         """
         Args:
             source_code_path: Path to the target applet .java source file.
@@ -91,10 +111,10 @@ class LLMSeedGenerator:
                 contains only ``wrap<Xxx>`` and ``core<Xxx>`` extracted
                 from the source.  When ``None``, the source reader falls
                 back to full-class extraction.
-            model: Model name or alias on the e-INFRA CZ endpoint
-                (e.g. ``"llama3.3:latest"``, ``"coder"``, ``"mini"``).
-            api_token: Bearer token for the e-INFRA CZ API.  When
-                ``None``, falls back to the ``LLM_API_TOKEN`` env var.
+            model: Model name or alias; when ``None``, resolved from
+                env/llm_config.ini via pipeline.llm_config.
+            api_token: Bearer token for the LLM API.  When ``None``, resolved
+                from env (LLM_API_TOKEN) / llm_config.ini.
         """
         self.source_code_path = source_code_path
         self.op_name = op_name
@@ -103,10 +123,11 @@ class LLMSeedGenerator:
         self.seed_output_dir = seed_output_dir
         self.seed_counter = 0
         self.seeds_accepted = 0
-        self.model = model
-        self.api_token = api_token or os.environ.get("LLM_API_TOKEN")
+        # Resolve backend settings via env var > llm_config.ini > default.
+        self.model = model or llm_config.model()
+        self.api_token = api_token or llm_config.api_token()
         self.print_prompt = print_prompt
-        self.llm_timeout = llm_timeout
+        self.llm_timeout = llm_timeout if llm_timeout is not None else llm_config.timeout()
         os.makedirs(seed_output_dir, exist_ok=True)
 
         # Deduplication: hashes of seeds already written (pre-populated from
@@ -155,10 +176,10 @@ class LLMSeedGenerator:
     # ==================================================================
 
     def call_llm(self, prompt):
-        """Send *prompt* to the e-INFRA CZ AI API and return the reply text.
+        """Send *prompt* to the configured LLM API and return the reply text.
 
-        Uses the OpenAI-compatible ``/v1/chat/completions`` endpoint at
-        ``llm.ai.e-infra.cz`` with ``self.model`` and ``self.api_token``.
+        Uses the OpenAI-compatible ``/v1/chat/completions`` endpoint from
+        pipeline.llm_config with ``self.model`` and ``self.api_token``.
 
         CAN be overridden to target a different backend (Anthropic,
         OpenAI, local, etc.).
@@ -184,7 +205,7 @@ class LLMSeedGenerator:
         }).encode("utf-8")
 
         req = urllib.request.Request(
-            E_INFRA_ENDPOINT,
+            llm_config.endpoint(),
             data=body,
             headers={
                 "Authorization": f"Bearer {self.api_token}",
@@ -418,47 +439,17 @@ class LLMSeedGenerator:
         else:
             acceptance_feedback = ""
 
-        prompt = f"""\
-You are a fuzzing expert specialising in timing side-channel detection.
-Your goal is to generate test inputs that cause execution paths A and B
-inside the Java Card applet to diverge — visiting different branches and
-producing different instruction counts — so that a timing side-channel
-can be observed.
+        acceptance_line = f"- {acceptance_feedback}" if acceptance_feedback else ""
 
-=== 1. Fuzzing input format received by driver ===
-{input_format}
-
-Each input encodes TWO independent invocations of the same operation.
-The applet executes the operation once with (p1_A, p2_A, len_A, data_A)
-and once with (p1_B, p2_B, len_B, data_B) under identical applet state.
-A side-channel exists when the two executions take different code paths.
-
-=== 2. Mapping of one fuzzing input to the actual values ===
-{input_mapping}
-
-=== 3. Fuzzed source code ===
-{source_context}
-
-=== 4. AFL++ fuzzer state ===
-{fuzzer_state_section}
-
-=== 5. AFL++ interesting inputs ===
-{inputs_section}
-
-=== Instructions ===
-Generate new test inputs that follow the exact byte layout shown in
-section 1.  Examine the conditional branches in the core method (section 3)
-that depend on p1, p2, len, or the data content.  Construct A and B halves
-that enter opposite branches of those conditions so the two executions
-diverge.  Also:
-- Explore edge values of p1, p2, and len (including len == 0 and
-  len == MAX_DATA).
-- Cover code paths not yet reached by the inputs in section 5.
-{f"- {acceptance_feedback}" if acceptance_feedback else ""}
-Return ONLY the raw hex-encoded test inputs, one per line.  No prose,
-no code fences, no commentary."""
-
-        return prompt
+        return render_prompt(
+            load_prompt("seed_generation.md"),
+            input_format=input_format,
+            input_mapping=input_mapping,
+            source_context=source_context,
+            fuzzer_state_section=fuzzer_state_section,
+            inputs_section=inputs_section,
+            acceptance_line=acceptance_line,
+        )
 
     def parse_seeds_from_response(self, response):
         """Parse LLM response text into a list of seed byte strings.

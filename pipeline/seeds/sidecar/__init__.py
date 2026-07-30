@@ -7,7 +7,7 @@ AFL++ polls automatically.
 
 Quick start::
 
-    from llm_seed_generator import LLMSeedGenerator
+    from sidecar import LLMSeedGenerator
 
     class MyGenerator(LLMSeedGenerator):
         def read_source_context(self):       # MUST implement

@@ -2,7 +2,7 @@
 """CLI entry point for the LLM seed generator.
 
 Run with:
-    python -m llm_seed_generator --source /path/to/src \
+    python -m sidecar --source /path/to/src \
                                  --afl-out /tmp/afl-out \
                                  --seed-dir /tmp/llm-seeds
 
@@ -14,23 +14,27 @@ users what to implement.  All logic lives in ``generator.py`` and
 import argparse
 import json
 import logging
-import os
 import sys
 import urllib.request
+from pathlib import Path
 
-from generator import LLMSeedGenerator, E_INFRA_DEFAULT_MODEL, E_INFRA_ENDPOINT, E_INFRA_TIMEOUT_SECONDS
+# Shared LLM backend config (env var > llm_config.ini > default).
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+import llm_config
 
-log = logging.getLogger("llm_seed_generator")
+from generator import LLMSeedGenerator
+
+log = logging.getLogger("sidecar")
 
 
 def list_models():
-    """Fetch and print available models from the e-INFRA CZ API."""
-    api_token = os.environ.get("LLM_API_TOKEN")
+    """Fetch and print available models from the configured LLM API."""
+    api_token = llm_config.api_token()
     if not api_token:
-        print("Error: LLM_API_TOKEN environment variable is not set.", file=sys.stderr)
+        print("Error: no API token (set LLM_API_TOKEN or api_token in llm_config.ini).", file=sys.stderr)
         sys.exit(1)
 
-    models_url = E_INFRA_ENDPOINT.replace("/chat/completions", "/models")
+    models_url = llm_config.endpoint().replace("/chat/completions", "/models")
     req = urllib.request.Request(
         models_url,
         headers={"Authorization": f"Bearer {api_token}"},
@@ -52,7 +56,7 @@ def main():
         description="LLM-based seed generator for AFL++ (via -F foreign sync)")
     parser.add_argument(
         "--list-models", action="store_true",
-        help="List available models from the e-INFRA CZ API and exit")
+        help="List available models from the configured LLM API and exit")
     parser.add_argument(
         "--source",
         help="Path to the target applet .java source file")
@@ -76,13 +80,12 @@ def main():
              "seconds have elapsed since the first generation cycle began. "
              "Match this to AFL++'s -V value. Omit to run indefinitely.")
     parser.add_argument(
-        "--timeout", type=int, default=E_INFRA_TIMEOUT_SECONDS,
-        help="Seconds to wait for a response from the LLM API "
-             f"(default: {E_INFRA_TIMEOUT_SECONDS}). Increase for slow/thinking models.")
+        "--timeout", type=int, default=None,
+        help="Seconds to wait for the LLM API; overrides env (LLM_TIMEOUT) / "
+             "llm_config.ini (default 120). Increase for slow/thinking models.")
     parser.add_argument(
-        "--model", default=E_INFRA_DEFAULT_MODEL,
-        help=f"e-INFRA CZ model name or alias (default: {E_INFRA_DEFAULT_MODEL}). "
-             "See https://docs.cerit.io/en/docs/ai-as-a-service/ai-api")
+        "--model", default=None,
+        help="Model name or alias; overrides the value from env (LLM_MODEL) / llm_config.ini.")
     parser.add_argument(
         "--print-prompt", action="store_true",
         help="Print the prompt sent to the LLM before each generation cycle")
