@@ -161,12 +161,12 @@ prompt (`--retries`, default 2); if it still doesn't validate, the
 candidate is dropped from `verdicts.jsonl` into `errors.jsonl` instead —
 never silently discarded from the run's accounting.
 
-**LLM call settings are copied verbatim from `jcseedgen/generator.py`**
-(`LLMSeedGenerator.call_llm`): the e-INFRA CZ OpenAI-compatible
-`/v1/chat/completions` endpoint, `gpt-oss-120b` default model, bearer
-token from `LLM_API_TOKEN`, 120s timeout, plain `urllib` (no extra HTTP
-dependency) — so this stage uses the same backend/auth as the rest of the
-pipeline rather than introducing a second LLM client.
+**The LLM backend is resolved through the shared `pipeline/llm_config.py`**
+loader (endpoint, model, timeout, token via **env var > `llm_config.ini` >
+default**), the same as every other LLM-calling stage — an OpenAI-compatible
+`/v1/chat/completions` endpoint over plain `urllib` (no extra HTTP dependency).
+Override the model/timeout per run with `--model` / `--timeout`. See the repo
+root `llm_config.ini.example`.
 
 ```
 export LLM_API_TOKEN=...
@@ -184,3 +184,12 @@ failure from the real model. Verified against the fixture: `checkPin`,
 `checkPinRenamed`, and `mix` validate on the first attempt;
 `applyDiscount` (the 3rd candidate) gets the injected malformed reply,
 fails validation, and recovers on the retry.
+
+## Editing the prompt
+
+The LLM prompt lives in [`prompts/verdict.md`](prompts/verdict.md), not in the
+Python. Edit that file to tune the wording, criteria, or output contract — no
+code change needed. `{{marker}}` placeholders (e.g. `{{source}}`,
+`{{fired}}`, `{{schema_block}}`) are filled by `build_prompt()` in
+`llm_final_verdict.py`; keep them intact and don't introduce new ones without
+adding the matching value in that function.

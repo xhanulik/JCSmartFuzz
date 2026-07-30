@@ -8,6 +8,7 @@ that fired (if any), and asks for a strict-JSON structured verdict:
       "is_custom_crypto": bool,
       "is_security_relevant": bool,
       "leak_mechanism": one of LEAK_MECHANISMS,
+      "severity": float in [0, 1],
       "confidence": float in [0, 1],
       "rationale": string
     }
@@ -18,12 +19,11 @@ the model) up to --retries times; if it still doesn't validate, the
 candidate is dropped from verdicts.jsonl and recorded in errors.jsonl
 instead (never silently discarded -- see the final summary line).
 
-LLM call settings are copied verbatim from jcseedgen/generator.py
-(LLMSeedGenerator.call_llm) so this step uses the same backend, model,
-auth, and timeout as the rest of the pipeline: the e-INFRA CZ
-OpenAI-compatible /v1/chat/completions endpoint, model gpt-oss-120b by
-default, bearer token from LLM_API_TOKEN, 120s timeout, stdlib
-urllib only (no extra HTTP dependency).
+The LLM backend (endpoint, model, timeout, token) is resolved through the
+shared pipeline.llm_config loader -- environment variable > llm_config.ini >
+built-in default -- the same as every other LLM-calling stage. Calls go to an
+OpenAI-compatible /v1/chat/completions endpoint using stdlib urllib only (no
+extra HTTP dependency).
 
 Usage:
     export LLM_API_TOKEN=...
@@ -38,20 +38,37 @@ Usage:
 import argparse
 import json
 import logging
-import os
+import re
 import sys
 import urllib.error
 import urllib.request
 from pathlib import Path
 
+# LLM backend settings (endpoint/model/timeout/token) are resolved through the
+# shared pipeline config loader -- env var > llm_config.ini > default -- so no
+# provider specifics are hardcoded here.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+import llm_config
+
 log = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Same LLM call settings as jcseedgen/generator.py (LLMSeedGenerator.call_llm)
+# Prompt templates live in prompts/ as editable text files (with {{marker}}
+# placeholders) so the wording can be tuned without touching this code.
 # ---------------------------------------------------------------------------
-E_INFRA_ENDPOINT = "https://llm.ai.e-infra.cz/v1/chat/completions"
-E_INFRA_DEFAULT_MODEL = "gpt-oss-120b"
-E_INFRA_TIMEOUT_SECONDS = 120
+PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
+
+
+def load_prompt(name):
+    """Read a prompt template from prompts/<name>."""
+    return (PROMPTS_DIR / name).read_text(encoding="utf-8")
+
+
+def render_prompt(template, **values):
+    """Substitute every {{name}} marker in *template* from *values* in a single
+    pass (inserted values are never re-scanned for further markers). Raises
+    KeyError if the template references a marker that was not supplied."""
+    return re.sub(r"{{\s*(\w+)\s*}}", lambda m: str(values[m.group(1)]), template)
 
 LEAK_MECHANISMS = [
     "timing-early-return-compare",
@@ -66,6 +83,7 @@ SCHEMA_FIELDS = {
     "is_custom_crypto": bool,
     "is_security_relevant": bool,
     "leak_mechanism": str,
+    "severity": (int, float),
     "confidence": (int, float),
     "rationale": str,
 }
@@ -87,6 +105,8 @@ def validate_verdict(obj):
             return f"field '{field}' has wrong type (expected {expected_type})"
     if obj["leak_mechanism"] not in LEAK_MECHANISMS:
         return f"leak_mechanism must be one of {LEAK_MECHANISMS}, got {obj['leak_mechanism']!r}"
+    if not (0.0 <= float(obj["severity"]) <= 1.0):
+        return "severity must be in [0, 1]"
     if not (0.0 <= float(obj["confidence"]) <= 1.0):
         return "confidence must be in [0, 1]"
     if not obj["rationale"].strip():
@@ -179,55 +199,29 @@ def build_prompt(candidate, rec, context):
         "is_custom_crypto": "boolean",
         "is_security_relevant": "boolean",
         "leak_mechanism": f"one of {LEAK_MECHANISMS}",
+        "severity": "number in [0, 1]",
         "confidence": "number in [0, 1]",
         "rationale": "short string explaining the verdict",
     }, indent=2)
 
-    return f"""\
-You are a security reviewer for Java Card applet source code, triaging a
-method for a timing/power side channel or custom-crypto review{
-        ' flagged by a deterministic static pre-filter' if fired_rules else
-        ' (reviewed directly, no static pre-filter stage was run)'
-    }.
+    prefilter_phrase = (
+        " flagged by a deterministic static pre-filter" if fired_rules else
+        " (reviewed directly, no static pre-filter stage was run)"
+    )
 
-=== Candidate method ===
-Class: {rec['class']}
-Method: {rec['method']}
-File: {rec['file']}
-
-=== Source ===
-{rec['source']}
-
-=== Non-local field reads/writes in this method ===
-{field_dataflow}
-
-=== Immediate context: direct internal callees ===
-{context}
-
-=== Static pre-filter rule(s) that fired ===
-{fired}
-
-=== Task ===
-Decide whether this method is a genuine security concern, not just why the
-rule fired syntactically. Consider:
-- is_custom_crypto: does this method implement a cryptographic primitive
-  or protocol step itself (XOR mixing, custom rotation, hand-rolled
-  compare/hash/MAC) rather than calling a vetted javacard.security /
-  javacardx.crypto API?
-- is_security_relevant: does this method handle secret material (PIN, key,
-  session token, etc.) such that its behavior (timing, branching) could
-  leak information about that secret to an attacker?
-- leak_mechanism: the single best-fitting category from the fixed list
-  below, or "none" if you conclude the pre-filter hit was a false positive.
-- confidence: your confidence in this verdict, 0.0-1.0.
-- rationale: 1-3 sentences justifying the verdict, referencing the actual
-  code (not just the rule name).
-
-leak_mechanism must be exactly one of: {LEAK_MECHANISMS}
-
-Respond with STRICT JSON ONLY, matching exactly this shape (no extra
-fields, no missing fields, no prose, no markdown code fences):
-{schema_block}"""
+    return render_prompt(
+        load_prompt("verdict.md"),
+        prefilter_phrase=prefilter_phrase,
+        **{"class": rec["class"]},
+        method=rec["method"],
+        file=rec["file"],
+        source=rec["source"],
+        field_dataflow=field_dataflow,
+        context=context,
+        fired=fired,
+        leak_mechanisms=LEAK_MECHANISMS,
+        schema_block=schema_block,
+    )
 
 
 def mock_llm(prompt, attempt, candidate):
@@ -250,6 +244,7 @@ def mock_llm(prompt, attempt, candidate):
             "custom-crypto-primitive" if "custom-xor-loop" in fired_ids or "custom-bit-rotate" in fired_ids else
             "none"
         ),
+        "severity": 0.5,
         "confidence": 0.7,
         "rationale": "[mock] verdict derived from fired rule ids for pipeline smoke-testing.",
     })
@@ -266,7 +261,7 @@ def call_llm(prompt, model, api_token, timeout):
     }).encode("utf-8")
 
     req = urllib.request.Request(
-        E_INFRA_ENDPOINT,
+        llm_config.endpoint(),
         data=body,
         headers={
             "Authorization": f"Bearer {api_token}",
@@ -290,6 +285,21 @@ def call_llm(prompt, model, api_token, timeout):
     if not choices:
         raise RuntimeError(f"LLM API returned no choices: {payload!r}")
     return choices[0]["message"]["content"]
+
+
+def list_models(api_token, timeout):
+    """Print the model ids the API endpoint offers (same endpoint used for
+    verdicts, so the list reflects what --model may be set to)."""
+    models_url = llm_config.endpoint().replace("/chat/completions", "/models")
+    req = urllib.request.Request(models_url, headers={"Authorization": f"Bearer {api_token}"})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except Exception as exc:
+        print(f"error: could not fetch models from {models_url}: {exc}", file=sys.stderr)
+        sys.exit(1)
+    for m in sorted(entry["id"] for entry in data.get("data", [])):
+        print(m)
 
 
 def get_verdict(candidate, rec, method_index, model, api_token, timeout, retries, mock):
@@ -338,25 +348,48 @@ def main():
                          "with no static pre-filtering.")
     ap.add_argument("-o", "--output", type=Path, default=Path("verdicts.jsonl"))
     ap.add_argument("--errors-output", type=Path, default=Path("errors.jsonl"))
-    ap.add_argument("--model", default=E_INFRA_DEFAULT_MODEL)
-    ap.add_argument("--api-token", default=None, help="falls back to LLM_API_TOKEN env var")
-    ap.add_argument("--timeout", type=float, default=E_INFRA_TIMEOUT_SECONDS)
+    ap.add_argument("--model", default=None, help="overrides the model from env/llm_config.ini")
+    ap.add_argument("--api-token", default=None, help="falls back to LLM_API_TOKEN env var / llm_config.ini")
+    ap.add_argument("--timeout", type=float, default=None, help="overrides the timeout from env/llm_config.ini")
     ap.add_argument("--retries", type=int, default=2, help="re-queries on malformed/invalid JSON before dropping")
     ap.add_argument("--top", type=int, default=None,
                     help="only process the first N candidates (by rank when --candidates is given, "
                          "by extraction order otherwise)")
     ap.add_argument("--mock", action="store_true", help="use a canned local responder instead of calling the real API")
+    ap.add_argument("--list-models", action="store_true",
+                    help="print the models the API endpoint offers and exit")
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args()
 
     logging.basicConfig(level=logging.INFO if args.verbose else logging.WARNING,
                          format="%(levelname)s %(message)s")
 
-    api_token = args.api_token or os.environ.get("LLM_API_TOKEN")
+    api_token = args.api_token or llm_config.api_token()
+
+    if args.list_models:
+        if not api_token:
+            print("error: --list-models needs a token (LLM_API_TOKEN, --api-token, or llm_config.ini)", file=sys.stderr)
+            sys.exit(1)
+        list_models(api_token, args.timeout if args.timeout is not None else llm_config.timeout())
+        return
+
     if not args.mock and not api_token:
-        print("error: LLM_API_TOKEN not set and --api-token not passed (use --mock to test without the API)",
+        print("error: no API token (set LLM_API_TOKEN, pass --api-token, or set it in llm_config.ini; use --mock to test without the API)",
               file=sys.stderr)
         sys.exit(1)
+
+    # Resolve the backend once (env var > llm_config.ini > default) and announce
+    # it, so the log makes the LLM in use explicit.
+    if args.mock:
+        model = args.model
+        timeout = args.timeout
+        print("LLM: --mock (canned local responder; no API calls)", file=sys.stderr)
+    else:
+        model = args.model or llm_config.model()
+        timeout = args.timeout if args.timeout is not None else llm_config.timeout()
+        print(f"LLM: model={model} endpoint={llm_config.endpoint()} "
+              f"(token via {'--api-token' if args.api_token else 'LLM_API_TOKEN/llm_config.ini'})",
+              file=sys.stderr)
 
     methods = load_jsonl(args.methods_jsonl)
     method_index = build_method_index(methods)
@@ -379,7 +412,7 @@ def main():
             continue
 
         obj, attempts, err = get_verdict(
-            candidate, rec, method_index, args.model, api_token, args.timeout, args.retries, args.mock)
+            candidate, rec, method_index, model, api_token, timeout, args.retries, args.mock)
 
         if obj is None:
             print(f"DROP  {rec['class']}.{rec['method']}: gave up after {attempts} attempt(s): {err}",
@@ -390,7 +423,7 @@ def main():
         print(f"OK    {rec['class']}.{rec['method']}: "
               f"security_relevant={obj['is_security_relevant']} "
               f"custom_crypto={obj['is_custom_crypto']} "
-              f"leak={obj['leak_mechanism']} confidence={obj['confidence']} "
+              f"leak={obj['leak_mechanism']} severity={obj['severity']} confidence={obj['confidence']} "
               f"(attempt {attempts})", file=sys.stderr)
         verdicts.append({**candidate, "verdict": obj, "attempts": attempts})
 
