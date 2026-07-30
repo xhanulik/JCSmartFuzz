@@ -1,0 +1,13 @@
+{
+  "_comment": "Maps the canonical library tokens used in corpus/dataset.json build.required_libs to actual jar/export paths on THIS machine. Edit the paths to point at your local jars. Paths may be absolute or relative to the repo root. build_target.py resolves each token here; a token with an empty/missing path is reported as unresolved (the build still prints the intended classpath in --dry-run).",
+
+  "jcardsim":      "libs/jcardsim-3.0.6.0.jar",
+  "kelinci":       "libs/kelinci.jar",
+  "bouncycastle":  "libs/bcprov-jdk18on-1.80.jar",
+
+  "globalplatform": "libs/gp-api-export.jar",
+  "openplatform":   "libs/openplatform-2.0-api.jar",
+  "oracle-jckit":   "libs/oracle-jckit-api.jar",
+  "cbor":           "libs/cbor.jar",
+  "sim-toolkit":    "libs/sim-toolkit-api.jar"
+}
