@@ -1,0 +1,28 @@
+# LLM backend configuration for the JCSmartFuzz pipeline.
+#
+# Copy this file to `llm_config.ini` (same directory) and edit the values.
+# `llm_config.ini` is git-ignored, so your local endpoint/model/token are
+# never committed.
+#
+# Every value below can also be set via an environment variable, which takes
+# precedence over this file. Resolution order per value:
+#     environment variable  >  llm_config.ini  >  built-in default
+#
+#   endpoint   <- LLM_ENDPOINT
+#   model      <- LLM_MODEL
+#   timeout    <- LLM_TIMEOUT
+#   api_token  <- LLM_API_TOKEN
+
+[llm]
+# OpenAI-compatible chat-completions endpoint (required).
+endpoint = https://llm.ai.e-infra.cz/v1/chat/completions
+
+# Default model name; override per run with --model (required).
+model = gpt-oss-120b
+
+# Request timeout in seconds (optional; defaults to 120).
+timeout = 120
+
+# Bearer token (optional here). Leave blank to require the LLM_API_TOKEN
+# environment variable instead of storing the secret on disk.
+api_token =
